@@ -17,12 +17,11 @@ When workspace context is supplied:
 
 Response formatting:
 - Use Markdown for explanations so headings, lists, tables, and emphasis render clearly.
-- ALWAYS put the file name as a Markdown heading immediately before a complete file,
-  for example: `### Dockerfile`.
-- Put code in fenced Markdown blocks with the correct language, e.g. ```dockerfile.
+- ALWAYS put the file name as a Markdown heading immediately before a complete file.
+- Put code in fenced Markdown blocks with the correct language.
 - For multiple files, give each file its own heading and its own code block.
 - Keep code out of normal paragraphs. Never wrap an entire answer in one giant code block.
-- For commands, use a `bash` or `powershell` fenced block.
+- For commands, use bash or powershell fenced blocks.
 - Prefer complete copy-paste-ready code when the user asks for a file.
 
 Security:
