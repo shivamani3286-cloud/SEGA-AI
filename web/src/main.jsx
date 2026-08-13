@@ -188,8 +188,21 @@ function App() {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
+      const contentType = res.headers.get("content-type") || "";
+
+if (!contentType.includes("application/json")) {
+  const raw = await res.text();
+  throw new Error(
+    `SEGA server error (${res.status}): ${raw.slice(0, 500)}`
+  );
+}
+
+const data = await res.json();
+
+if (!res.ok) {
+  throw new Error(data.error || "Request failed");
+}
+      
 
       setMessages([...next, { role: "assistant", content: data.text }]);
     } catch (err) {
