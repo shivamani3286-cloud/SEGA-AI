@@ -693,15 +693,50 @@ function App() {
    * This fixes the previous read-only problem.
    */
  async function generateAIEdit() {
-  if (!editRequest || !editPrompt.trim()) {
+  if (!editRequest) {
+    setEditStatus("No file selected for editing.");
+    return;
+  }
+
+  if (!editPrompt.trim()) {
     setEditStatus("Describe what you want SEGA to change.");
     return;
   }
 
   setEditBusy(true);
-  setEditStatus("SEGA is analyzing the file...");
+  setEditStatus("SEGA is thinking...");
 
   try {
+    const prompt = `
+You are modifying an existing project file.
+
+FILE PATH:
+${editRequest.path}
+
+CURRENT FILE:
+---BEGIN FILE---
+${editRequest.original}
+---END FILE---
+
+USER REQUEST:
+${editPrompt}
+
+TASK:
+Modify the current file according to the user's request.
+
+STRICT OUTPUT RULES:
+1. Return ONLY the complete modified file.
+2. Return the entire file, including unchanged sections.
+3. Do NOT explain anything.
+4. Do NOT add comments about what you changed unless they are part of the requested code.
+5. Do NOT add a filename heading.
+6. Do NOT write "Copy".
+7. Do NOT use Markdown outside the file.
+8. Do NOT use triple backticks.
+9. Preserve everything that does not need to change.
+10. Make only the changes required by the user's request.
+`;
+
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
@@ -711,31 +746,7 @@ function App() {
         messages: [
           {
             role: "user",
-            content: `
-You are editing an existing project file.
-
-FILE PATH:
-${editRequest.path}
-
-ORIGINAL FILE:
----BEGIN FILE---
-${editRequest.original}
----END FILE---
-
-USER REQUEST:
-${editPrompt}
-
-Return ONLY the complete modified file contents.
-
-Do not use Markdown.
-Do not use triple backticks.
-Do not add explanations.
-Do not add the filename.
-Do not add "Copy".
-Do not omit unchanged sections.
-
-Preserve everything that does not need to change.
-`
+            content: prompt
           }
         ],
         workspace: [
@@ -747,33 +758,126 @@ Preserve everything that does not need to change.
       })
     });
 
-    const data = await response.json();
+    /*
+     * Read the response as text first.
+     * This prevents:
+     *
+     * Unexpected token '<'
+     * Unexpected token 'A'
+     *
+     * when Vercel returns an HTML/error response.
+     */
+    const rawResponse = await response.text();
 
-    if (!response.ok) {
+    let data;
+
+    try {
+      data = JSON.parse(rawResponse);
+    } catch {
+      console.error(
+        "SEGA returned non-JSON response:",
+        rawResponse
+      );
+
       throw new Error(
-        data?.error || "SEGA failed to generate the edit."
+        `Server returned an invalid response (HTTP ${response.status}).`
       );
     }
 
-    let proposed = String(data?.text || "").trim();
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+        `SEGA request failed with HTTP ${response.status}.`
+      );
+    }
 
-    // Remove accidental Markdown fences if Gemini ignores the instruction.
+    let proposed = String(
+      data?.text || ""
+    ).trim();
+
+    if (!proposed) {
+      throw new Error(
+        "SEGA returned an empty edit."
+      );
+    }
+
+    /*
+     * Gemini may ignore the "no Markdown" instruction
+     * and return:
+     *
+     * ```dockerfile
+     * FROM node:22-alpine
+     * ```
+     *
+     * Extract only the actual file contents.
+     */
+    const fencedMatch = proposed.match(
+      /^```[^\n]*\n([\s\S]*?)\n```$/
+    );
+
+    if (fencedMatch) {
+      proposed = fencedMatch[1].trim();
+    }
+
+    /*
+     * Remove a filename heading if Gemini adds one.
+     *
+     * Example:
+     *
+     * ### Dockerfile
+     * FROM node:22-alpine
+     *
+     * becomes:
+     *
+     * FROM node:22-alpine
+     */
+    const fileName = editRequest.path
+      .split("/")
+      .pop();
+
+    const escapedFileName = fileName
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const headingPattern = new RegExp(
+      `^(?:#{1,6}\\s*|\\*\\*)${escapedFileName}(?:\\*\\*)?\\s*\\n+`,
+      "i"
+    );
+
     proposed = proposed
-      .replace(/^```[a-zA-Z0-9_-]*\s*/i, "")
-      .replace(/\s*```$/i, "")
+      .replace(headingPattern, "")
       .trim();
 
     if (!proposed) {
-      throw new Error("SEGA returned an empty edit.");
+      throw new Error(
+        "SEGA generated an empty file."
+      );
     }
 
+    /*
+     * Put the generated complete file into the
+     * editable textarea.
+     *
+     * NOTHING is written to disk here.
+     */
     setEditText(proposed);
-    setEditStatus("Edit generated. Review it before applying.");
-  } catch (error) {
-    console.error("SEGA edit error:", error);
+
     setEditStatus(
-      error?.message || "SEGA could not generate the edit."
+      "✓ Edit generated. Review the complete file before applying."
     );
+
+  } catch (error) {
+    console.error(
+      "SEGA Generate Edit error:",
+      error
+    );
+
+    setEditStatus(
+      `SEGA error: ${
+        error?.message ||
+        "Could not generate the edit."
+      }`
+    );
+
   } finally {
     setEditBusy(false);
   }
