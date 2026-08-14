@@ -107,6 +107,27 @@ function MarkdownMessage({ content }) {
   );
 }
 
+
+function searchFiles(files, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const results = [];
+  for (const file of files) {
+    const lines = file.content.split(/\r?\n/);
+    if (file.path.toLowerCase().includes(q)) {
+      results.push({ path: file.path, line: 1, text: lines[0]?.slice(0, 180) || file.path });
+    }
+    lines.forEach((line, index) => {
+      if (results.length >= 60) return;
+      if (line.toLowerCase().includes(q)) {
+        results.push({ path: file.path, line: index + 1, text: line.trim().slice(0, 240) });
+      }
+    });
+    if (results.length >= 60) break;
+  }
+  return results;
+}
+
 function App() {
   const [messages, setMessages] = useState([
     {
@@ -119,9 +140,13 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [files, setFiles] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedSearch, setSelectedSearch] = useState([]);
   const folderInput = useRef(null);
 
   const tree = useMemo(() => files.map(f => f.path).slice(0, 80), [files]);
+  const searchResults = useMemo(() => searchFiles(files, searchQuery), [files, searchQuery]);
 
   async function openFiles(fileList) {
     const selected = Array.from(fileList || [])
@@ -153,6 +178,8 @@ function App() {
   function clearProject() {
     setFiles([]);
     setProjectName("");
+    setSearchQuery("");
+    setSelectedSearch([]);
   }
 
   async function send() {
@@ -166,8 +193,11 @@ function App() {
 
     const workspace = [];
     let remaining = MAX_CONTEXT_CHARS;
+    const sourceFiles = selectedSearch.length
+      ? files.filter(f => selectedSearch.some(r => r.path === f.path))
+      : files;
 
-    for (const file of files) {
+    for (const file of sourceFiles) {
       if (remaining <= 0) break;
       const content = file.content.slice(0, remaining);
       workspace.push({
@@ -188,21 +218,8 @@ function App() {
         })
       });
 
-      const contentType = res.headers.get("content-type") || "";
-
-if (!contentType.includes("application/json")) {
-  const raw = await res.text();
-  throw new Error(
-    `SEGA server error (${res.status}): ${raw.slice(0, 500)}`
-  );
-}
-
-const data = await res.json();
-
-if (!res.ok) {
-  throw new Error(data.error || "Request failed");
-}
-      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
 
       setMessages([...next, { role: "assistant", content: data.text }]);
     } catch (err) {
@@ -234,6 +251,59 @@ if (!res.ok) {
         <button className="project-button" onClick={openProject}>
           📁 Open project
         </button>
+
+        <button
+          className={`search-project ${!files.length ? "disabled" : ""}`}
+          onClick={() => files.length && setSearchOpen(v => !v)}
+          disabled={!files.length}
+        >
+          🔎 Search project
+        </button>
+
+        {searchOpen && files.length > 0 && (
+          <div className="search-panel">
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search code or filename..."
+            />
+            <div className="search-meta">
+              {searchQuery ? `${searchResults.length} matches` : "Type to search"}
+            </div>
+            <div className="search-results">
+              {searchResults.map((r, i) => (
+                <button
+                  key={`${r.path}:${r.line}:${i}`}
+                  className="search-result"
+                  onClick={() => setSelectedSearch(prev =>
+                    prev.some(x => x.path === r.path) ? prev : [...prev, r]
+                  )}
+                >
+                  <strong>{r.path}</strong>
+                  <span>Line {r.line}</span>
+                  <code>{r.text}</code>
+                </button>
+              ))}
+              {searchQuery && !searchResults.length && (
+                <div className="no-results">No matches found.</div>
+              )}
+            </div>
+            {selectedSearch.length > 0 && (
+              <div className="selected-search">
+                <div className="selected-title">Selected context</div>
+                {selectedSearch.map(r => (
+                  <button
+                    key={r.path}
+                    onClick={() => setSelectedSearch(prev => prev.filter(x => x.path !== r.path))}
+                  >
+                    {r.path} ×
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <input
           ref={folderInput}
@@ -327,6 +397,11 @@ if (!res.ok) {
         </section>
 
         <div className="composer">
+          {selectedSearch.length > 0 && (
+            <div className="context-strip">
+              🔎 Using {selectedSearch.length} selected file{selectedSearch.length > 1 ? "s" : ""} as context
+            </div>
+          )}
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
