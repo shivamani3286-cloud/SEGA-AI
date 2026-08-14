@@ -360,6 +360,77 @@ function MarkdownMessage({ content }) {
   );
 }
 
+function createDiff(original, updated) {
+  const oldLines = String(original || "").split(/\r?\n/);
+  const newLines = String(updated || "").split(/\r?\n/);
+
+  const diff = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < oldLines.length || j < newLines.length) {
+    const oldLine = oldLines[i];
+    const newLine = newLines[j];
+
+    if (oldLine === newLine) {
+      diff.push({
+        type: "same",
+        text: oldLine ?? ""
+      });
+
+      i++;
+      j++;
+      continue;
+    }
+
+    if (
+      i + 1 < oldLines.length &&
+      oldLines[i + 1] === newLine
+    ) {
+      diff.push({
+        type: "removed",
+        text: oldLine ?? ""
+      });
+
+      i++;
+      continue;
+    }
+
+    if (
+      j + 1 < newLines.length &&
+      oldLine === newLines[j + 1]
+    ) {
+      diff.push({
+        type: "added",
+        text: newLine ?? ""
+      });
+
+      j++;
+      continue;
+    }
+
+    if (oldLine !== undefined) {
+      diff.push({
+        type: "removed",
+        text: oldLine
+      });
+
+      i++;
+    }
+
+    if (newLine !== undefined) {
+      diff.push({
+        type: "added",
+        text: newLine
+      });
+
+      j++;
+    }
+  }
+
+  return diff;
+}
+
 function searchFiles(files, query) {
   const q = query.trim().toLowerCase();
 
