@@ -143,6 +143,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState([]);
+  const [editRequest, setEditRequest] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [editStatus, setEditStatus] = useState("");
   const folderInput = useRef(null);
 
   const tree = useMemo(() => files.map(f => f.path).slice(0, 80), [files]);
@@ -156,18 +159,58 @@ function App() {
 
     const loaded = [];
     for (const file of selected) {
-      try {
-        loaded.push(await readEntry(file));
-      } catch {
-        // Ignore unreadable files.
-      }
+      try { loaded.push(await readEntry(file)); } catch {}
+    }
+    setFiles(loaded);
+    if (loaded.length) setProjectName(loaded[0].path.split("/")[0] || "Workspace");
+  }
+
+  async function openProject() {
+    if (!window.showDirectoryPicker) {
+      folderInput.current?.click();
+      return;
     }
 
-    setFiles(loaded);
+    try {
+      const dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+      const loaded = [];
+      await readDirectoryHandle(dirHandle, "", loaded);
 
-    if (loaded.length) {
-      const first = loaded[0].path.split("/")[0];
-      setProjectName(first || "Workspace");
+      setFiles(loaded.slice(0, MAX_FILES));
+      setProjectName(dirHandle.name || "Workspace");
+      setSearchQuery("");
+      setSelectedSearch([]);
+      setEditStatus(`Opened ${dirHandle.name} with read/write permission.`);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setEditStatus(`Could not open project: ${err.message}`);
+      }
+    }
+  }
+
+  async function readDirectoryHandle(dirHandle, prefix, loaded) {
+    for await (const entry of dirHandle.values()) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (ignored(path)) continue;
+
+      if (entry.kind === "directory") {
+        if (["node_modules", ".git", "dist", "build", ".next", "coverage"].includes(entry.name)) continue;
+        await readDirectoryHandle(entry, path, loaded);
+        if (loaded.length >= MAX_FILES) return;
+      } else if (entry.kind === "file" && isProbablyText(entry.name)) {
+        try {
+          const file = await entry.getFile();
+          if (file.size > MAX_FILE_CHARS * 2) continue;
+          const text = await file.text();
+          loaded.push({
+            path,
+            content: text.slice(0, MAX_FILE_CHARS),
+            truncated: text.length > MAX_FILE_CHARS,
+            handle: entry
+          });
+        } catch {}
+      }
+      if (loaded.length >= MAX_FILES) return;
     }
   }
 
@@ -180,6 +223,44 @@ function App() {
     setProjectName("");
     setSearchQuery("");
     setSelectedSearch([]);
+  }
+
+
+  function proposeEdit() {
+    const path = selectedSearch[0]?.path;
+    const file = files.find(f => f.path === path);
+    if (!file) {
+      setEditStatus("Select a file from Search project first.");
+      return;
+    }
+    setEditRequest({ path: file.path, original: file.content });
+    setEditText(file.content);
+    setEditStatus("Review the proposed file contents before applying.");
+  }
+
+  async function applyEdit() {
+    if (!editRequest) return;
+    try {
+      const handle = editRequest.handle;
+      if (!handle) {
+        setEditStatus(
+          "This browser session indexed file contents read-only. Re-open the project with the file editor enabled to write changes."
+        );
+        return;
+      }
+      const writable = await handle.createWritable();
+      await writable.write(editText);
+      await writable.close();
+      setFiles(prev => prev.map(f =>
+        f.path === editRequest.path
+          ? { ...f, content: editText, truncated: false }
+          : f
+      ));
+      setEditRequest(null);
+      setEditStatus(`Applied changes to ${editRequest.path}.`);
+    } catch (err) {
+      setEditStatus(`Could not write file: ${err.message}`);
+    }
   }
 
   async function send() {
@@ -300,6 +381,9 @@ function App() {
                     {r.path} ×
                   </button>
                 ))}
+                <button className="edit-selected" onClick={proposeEdit}>
+                  ✏️ Propose edit for selected file
+                </button>
               </div>
             )}
           </div>
@@ -424,6 +508,37 @@ function App() {
             </button>
           </div>
         </div>
+
+        {editRequest && (
+          <div className="edit-overlay">
+            <div className="edit-modal">
+              <div className="edit-modal-header">
+                <div>
+                  <strong>SEGA wants to modify</strong>
+                  <span>{editRequest.path}</span>
+                </div>
+                <button onClick={() => setEditRequest(null)}>×</button>
+              </div>
+              <p className="edit-warning">
+                Review the complete file below. Nothing is written until you click Apply Change.
+              </p>
+              <textarea
+                className="edit-textarea"
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                spellCheck={false}
+              />
+              <div className="edit-actions">
+                <button onClick={() => setEditRequest(null)}>Cancel</button>
+                <button className="apply-edit" onClick={applyEdit}>✓ Apply Change</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {editStatus && (
+          <div className="edit-status" role="status">{editStatus}</div>
+        )}
       </main>
     </div>
   );
