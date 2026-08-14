@@ -910,6 +910,7 @@ STRICT OUTPUT RULES:
     setEditBusy(false);
   }
 }
+
   function applyAIEdit() {
   if (!editRequest || !editText.trim()) {
     setEditStatus("No generated edit is available.");
@@ -929,14 +930,7 @@ STRICT OUTPUT RULES:
     )
   );
 
-  setEditRequest((current) =>
-    current
-      ? {
-          ...current,
-          original: updatedContent
-        }
-      : current
-  );
+ 
 
   setEditStatus("✓ Changes applied successfully.");
 }function undoAIEdit() {
