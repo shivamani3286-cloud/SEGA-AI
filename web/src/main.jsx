@@ -192,7 +192,37 @@ function CodeBlock({ inline, className, children }) {
   );
 }
 
+
+
+function cleanSEGAResponse(content) {
+  if (!content) return "";
+
+  let text = String(content);
+
+  text = text.replace(/^\s*\*\*Code\*\*\s*Copy\s*$/gim, "");
+  text = text.replace(/^\s*\*\*Code\*\*\s*$/gim, "");
+  text = text.replace(/^\s*Code\s+Copy\s*$/gim, "");
+
+  text = text.replace(
+    /^\s*\*\*(Dockerfile|Nginx|JavaScript|TypeScript|Python|JSON|YAML|Bash|CSS|HTML)\*\*\s*Copy\s*$/gim,
+    ""
+  );
+
+  text = text.replace(/^\s*CodeCopy\s*$/gim, "");
+
+  text = text.replace(
+    /```(?:text|plaintext)?\s*\n\s*(Dockerfile|dockerfile|nginx\.conf|package\.json|package-lock\.json|index\.html|main\.jsx|App\.jsx|styles\.css|\.env)\s*\n```/gim,
+    ""
+  );
+
+  text = text.replace(/\n{4,}/g, "\n\n");
+
+  return text.trim();
+}
+
 function MarkdownMessage({ content }) {
+  const cleanedContent = cleanSEGAResponse(content);
+
   return (
     <div className="markdown">
       <ReactMarkdown
@@ -213,7 +243,7 @@ function MarkdownMessage({ content }) {
           )
         }}
       >
-        {content}
+        {cleanedContent}
       </ReactMarkdown>
     </div>
   );
