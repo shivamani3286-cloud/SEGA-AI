@@ -199,29 +199,139 @@ function cleanSEGAResponse(content) {
 
   let text = String(content);
 
-  text = text.replace(/^\s*\*\*Code\*\*\s*Copy\s*$/gim, "");
-  text = text.replace(/^\s*\*\*Code\*\*\s*$/gim, "");
-  text = text.replace(/^\s*Code\s+Copy\s*$/gim, "");
+  /*
+   * ==========================================================
+   * REMOVE AI-GENERATED UI LABELS
+   * ==========================================================
+   *
+   * The SEGA frontend already creates:
+   *
+   *     Dockerfile                         Copy
+   *
+   * Gemini must NOT generate those labels itself.
+   */
 
   text = text.replace(
-    /^\s*\*\*(Dockerfile|Nginx|JavaScript|TypeScript|Python|JSON|YAML|Bash|CSS|HTML)\*\*\s*Copy\s*$/gim,
+    /^\s*\*\*Code\*\*\s*Copy\s*$/gim,
     ""
   );
 
-  text = text.replace(/^\s*CodeCopy\s*$/gim, "");
-
   text = text.replace(
-    /```(?:text|plaintext)?\s*\n\s*(Dockerfile|dockerfile|nginx\.conf|package\.json|package-lock\.json|index\.html|main\.jsx|App\.jsx|styles\.css|\.env)\s*\n```/gim,
+    /^\s*\*\*Code\*\*\s*$/gim,
     ""
   );
 
-  text = text.replace(/\n{4,}/g, "\n\n");
+  text = text.replace(
+    /^\s*Code\s+Copy\s*$/gim,
+    ""
+  );
+
+  text = text.replace(
+    /^\s*CodeCopy\s*$/gim,
+    ""
+  );
+
+  text = text.replace(
+    /^\s*\*\*(Dockerfile|Nginx|JavaScript|TypeScript|Python|JSON|YAML|Bash|CSS|HTML|Terraform|Shell)\*\*\s*Copy\s*$/gim,
+    ""
+  );
+
+  /*
+   * ==========================================================
+   * REMOVE FILENAME-ONLY CODE BLOCKS
+   * ==========================================================
+   *
+   * This is the important fix.
+   *
+   * It catches ALL language identifiers:
+   *
+   * ```text
+   * Dockerfile
+   * ```
+   *
+   * ```dockerfile
+   * Dockerfile
+   * ```
+   *
+   * ```nginx
+   * nginx.conf
+   * ```
+   *
+   * ```javascript
+   * main.jsx
+   * ```
+   *
+   * etc.
+   */
+
+  const filenameOnlyPattern =
+    /```[^\n]*\n\s*([A-Za-z0-9_.-]+)\s*\n```/gim;
+
+  text = text.replace(
+    filenameOnlyPattern,
+    (match, filename) => {
+
+      const knownFile =
+        /^(Dockerfile|dockerfile|nginx\.conf|package\.json|package-lock\.json|package-lock\.yaml|index\.html|main\.jsx|App\.jsx|App\.tsx|main\.tsx|styles\.css|\.env|\.gitignore|vite\.config\.(js|ts)|tsconfig\.json|README\.md)$/i;
+
+      /*
+       * Only remove it if the content is clearly a filename.
+       */
+      if (knownFile.test(filename.trim())) {
+        return "";
+      }
+
+      return match;
+    }
+  );
+
+  /*
+   * ==========================================================
+   * REMOVE EMPTY FENCES
+   * ==========================================================
+   */
+
+  text = text.replace(
+    /```[^\n]*\n\s*```/g,
+    ""
+  );
+
+  /*
+   * ==========================================================
+   * REMOVE DUPLICATE FILE LABELS
+   * ==========================================================
+   *
+   * Example:
+   *
+   * **Dockerfile**
+   *
+   * ### Dockerfile
+   *
+   * We keep the proper Markdown heading.
+   */
+
+  text = text.replace(
+    /^\s*\*\*(Dockerfile|nginx\.conf|package\.json|main\.jsx|styles\.css)\*\*\s*$/gim,
+    ""
+  );
+
+  /*
+   * ==========================================================
+   * CLEAN EXCESSIVE BLANK LINES
+   * ==========================================================
+   */
+
+  text = text.replace(
+    /\n{4,}/g,
+    "\n\n"
+  );
 
   return text.trim();
 }
 
 function MarkdownMessage({ content }) {
-  const cleanedContent = cleanSEGAResponse(content);
+  const cleanedContent =
+    cleanSEGAResponse(content);
 
   return (
     <div className="markdown">
@@ -230,7 +340,9 @@ function MarkdownMessage({ content }) {
         components={{
           code: CodeBlock,
 
-          pre: ({ children }) => <>{children}</>,
+          pre: ({ children }) => (
+            <>{children}</>
+          ),
 
           a: ({ href, children }) => (
             <a
