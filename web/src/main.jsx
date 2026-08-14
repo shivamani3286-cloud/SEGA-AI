@@ -809,6 +809,8 @@ Preserve everything that does not need to change.
     });
 
     setEditText(file.content);
+    setEditPrompt("");
+    setEditStatus("");
 
     setEditStatus(
       "Review the proposed file before applying it."
