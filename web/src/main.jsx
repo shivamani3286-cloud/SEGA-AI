@@ -329,7 +329,7 @@ function cleanSEGAResponse(content) {
   return text.trim();
 }
 
-ffunction MarkdownMessage({ content }) {
+function MarkdownMessage({ content }) {
   const cleanedContent = cleanSEGAResponse(content);
 
   return (
