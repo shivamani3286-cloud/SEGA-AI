@@ -7,8 +7,15 @@ import "./styles.css";
 const API = "";
 
 const IGNORE = [
-  "node_modules/", ".git/", "dist/", "build/", ".next/",
-  "coverage/", ".venv/", "venv/", "__pycache__/"
+  "node_modules/",
+  ".git/",
+  "dist/",
+  "build/",
+  ".next/",
+  "coverage/",
+  ".venv/",
+  "venv/",
+  "__pycache__/"
 ];
 
 const MAX_FILES = 80;
@@ -17,41 +24,99 @@ const MAX_CONTEXT_CHARS = 140000;
 
 function isProbablyText(name, type = "") {
   if (type.startsWith("text/")) return true;
+
+  const lowerName = name.toLowerCase();
   const ext = name.split(".").pop()?.toLowerCase();
+
   return [
-    "js","jsx","ts","tsx","json","html","css","scss","md","txt","yml","yaml",
-    "py","java","go","rs","c","cpp","h","hpp","cs","php","rb","sh","bash",
-    "sql","tf","tfvars","xml","toml","ini","env.example","properties",
-    "dockerfile","conf","nginx"
-  ].includes(ext) || name.toLowerCase().includes("dockerfile");
+    "js",
+    "jsx",
+    "ts",
+    "tsx",
+    "json",
+    "html",
+    "css",
+    "scss",
+    "md",
+    "txt",
+    "yml",
+    "yaml",
+    "py",
+    "java",
+    "go",
+    "rs",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cs",
+    "php",
+    "rb",
+    "sh",
+    "bash",
+    "sql",
+    "tf",
+    "tfvars",
+    "xml",
+    "toml",
+    "ini",
+    "properties",
+    "conf",
+    "nginx"
+  ].includes(ext) || lowerName.includes("dockerfile");
 }
 
 function ignored(path) {
   const p = path.replaceAll("\\", "/");
-  return IGNORE.some(x => p.includes(x));
+  return IGNORE.some((x) => p.includes(x));
 }
 
 async function readEntry(file) {
   const text = await file.text();
+
   return {
     path: file.webkitRelativePath || file.name,
     content: text.slice(0, MAX_FILE_CHARS),
-    truncated: text.length > MAX_FILE_CHARS
+    truncated: text.length > MAX_FILE_CHARS,
+    handle: null
   };
 }
 
-
 function languageLabel(language) {
   const map = {
-    js: "JavaScript", jsx: "JSX", ts: "TypeScript", tsx: "TSX",
-    json: "JSON", html: "HTML", css: "CSS", scss: "SCSS",
-    py: "Python", python: "Python", java: "Java", go: "Go",
-    rs: "Rust", sh: "Shell", bash: "Bash", powershell: "PowerShell",
-    ps: "PowerShell", sql: "SQL", yaml: "YAML", yml: "YAML",
-    dockerfile: "Dockerfile", docker: "Docker", nginx: "Nginx",
-    tf: "Terraform", hcl: "HCL", xml: "XML", md: "Markdown",
-    markdown: "Markdown", c: "C", cpp: "C++", cs: "C#",
+    js: "JavaScript",
+    jsx: "JSX",
+    ts: "TypeScript",
+    tsx: "TSX",
+    json: "JSON",
+    html: "HTML",
+    css: "CSS",
+    scss: "SCSS",
+    py: "Python",
+    python: "Python",
+    java: "Java",
+    go: "Go",
+    rs: "Rust",
+    sh: "Shell",
+    bash: "Bash",
+    powershell: "PowerShell",
+    ps: "PowerShell",
+    sql: "SQL",
+    yaml: "YAML",
+    yml: "YAML",
+    dockerfile: "Dockerfile",
+    docker: "Docker",
+    nginx: "Nginx",
+    tf: "Terraform",
+    hcl: "HCL",
+    xml: "XML",
+    md: "Markdown",
+    markdown: "Markdown",
+    c: "C",
+    cpp: "C++",
+    cs: "C#"
   };
+
   return map[language] || language || "Code";
 }
 
@@ -69,7 +134,10 @@ function CodeBlock({ inline, className, children }) {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1400);
     } catch {
       setCopied(false);
     }
@@ -78,12 +146,18 @@ function CodeBlock({ inline, className, children }) {
   return (
     <div className="code-block">
       <div className="code-header">
-        <span className="code-language">{languageLabel(language)}</span>
+        <span className="code-language">
+          {languageLabel(language)}
+        </span>
+
         <button className="copy-code" onClick={copyCode}>
           {copied ? "✓ Copied" : "Copy"}
         </button>
       </div>
-      <pre className="code-content"><code>{code}</code></pre>
+
+      <pre className="code-content">
+        <code>{code}</code>
+      </pre>
     </div>
   );
 }
@@ -95,10 +169,18 @@ function MarkdownMessage({ content }) {
         remarkPlugins={[remarkGfm]}
         components={{
           code: CodeBlock,
+
           pre: ({ children }) => <>{children}</>,
+
           a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer">{children}</a>
-          ),
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {children}
+            </a>
+          )
         }}
       >
         {content}
@@ -107,24 +189,39 @@ function MarkdownMessage({ content }) {
   );
 }
 
-
 function searchFiles(files, query) {
   const q = query.trim().toLowerCase();
+
   if (!q) return [];
+
   const results = [];
+
   for (const file of files) {
     const lines = file.content.split(/\r?\n/);
+
     if (file.path.toLowerCase().includes(q)) {
-      results.push({ path: file.path, line: 1, text: lines[0]?.slice(0, 180) || file.path });
+      results.push({
+        path: file.path,
+        line: 1,
+        text: lines[0]?.slice(0, 180) || file.path
+      });
     }
+
     lines.forEach((line, index) => {
       if (results.length >= 60) return;
+
       if (line.toLowerCase().includes(q)) {
-        results.push({ path: file.path, line: index + 1, text: line.trim().slice(0, 240) });
+        results.push({
+          path: file.path,
+          line: index + 1,
+          text: line.trim().slice(0, 240)
+        });
       }
     });
+
     if (results.length >= 60) break;
   }
+
   return results;
 }
 
@@ -136,35 +233,74 @@ function App() {
         "Hi, I'm SEGA. Open a project and I can reason about its files, architecture, errors, and code. Your project files stay in your browser unless you send them in a chat request."
     }
   ]);
+
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+
   const [files, setFiles] = useState([]);
   const [projectName, setProjectName] = useState("");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState([]);
+
   const [editRequest, setEditRequest] = useState(null);
   const [editText, setEditText] = useState("");
   const [editStatus, setEditStatus] = useState("");
+
   const folderInput = useRef(null);
 
-  const tree = useMemo(() => files.map(f => f.path).slice(0, 80), [files]);
-  const searchResults = useMemo(() => searchFiles(files, searchQuery), [files, searchQuery]);
+  const tree = useMemo(
+    () => files.map((f) => f.path).slice(0, 80),
+    [files]
+  );
 
+  const searchResults = useMemo(
+    () => searchFiles(files, searchQuery),
+    [files, searchQuery]
+  );
+
+  /*
+   * Fallback folder picker.
+   * This method is READ-ONLY because the browser only gives us File objects.
+   */
   async function openFiles(fileList) {
     const selected = Array.from(fileList || [])
-      .filter(f => isProbablyText(f.name, f.type))
-      .filter(f => !ignored(f.webkitRelativePath || f.name))
+      .filter((f) => isProbablyText(f.name, f.type))
+      .filter((f) =>
+        !ignored(f.webkitRelativePath || f.name)
+      )
       .slice(0, MAX_FILES);
 
     const loaded = [];
+
     for (const file of selected) {
-      try { loaded.push(await readEntry(file)); } catch {}
+      try {
+        loaded.push(await readEntry(file));
+      } catch {
+        // Ignore unreadable files.
+      }
     }
+
     setFiles(loaded);
-    if (loaded.length) setProjectName(loaded[0].path.split("/")[0] || "Workspace");
+
+    if (loaded.length) {
+      setProjectName(
+        loaded[0].path.split("/")[0] || "Workspace"
+      );
+    }
+
+    setEditStatus(
+      "Project opened in read-only fallback mode. Use Chrome or Edge for Safe Edit."
+    );
   }
 
+  /*
+   * IMPORTANT:
+   * This is the ONLY openProject function.
+   *
+   * It requests read/write access using the File System Access API.
+   */
   async function openProject() {
     if (!window.showDirectoryPicker) {
       folderInput.current?.click();
@@ -172,141 +308,326 @@ function App() {
     }
 
     try {
-      const dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+      const dirHandle =
+        await window.showDirectoryPicker({
+          mode: "readwrite"
+        });
+
       const loaded = [];
-      await readDirectoryHandle(dirHandle, "", loaded);
+
+      await readDirectoryHandle(
+        dirHandle,
+        "",
+        loaded
+      );
 
       setFiles(loaded.slice(0, MAX_FILES));
-      setProjectName(dirHandle.name || "Workspace");
+
+      setProjectName(
+        dirHandle.name || "Workspace"
+      );
+
       setSearchQuery("");
+      setSearchOpen(false);
       setSelectedSearch([]);
-      setEditStatus(`Opened ${dirHandle.name} with read/write permission.`);
+
+      setEditStatus(
+        `Opened ${dirHandle.name} with read/write permission.`
+      );
     } catch (err) {
       if (err.name !== "AbortError") {
-        setEditStatus(`Could not open project: ${err.message}`);
+        setEditStatus(
+          `Could not open project: ${err.message}`
+        );
       }
     }
   }
 
-  async function readDirectoryHandle(dirHandle, prefix, loaded) {
+  /*
+   * Recursively reads the project directory.
+   *
+   * The important part is:
+   *
+   * handle: entry
+   *
+   * That FileSystemFileHandle is later used by Apply Change.
+   */
+  async function readDirectoryHandle(
+    dirHandle,
+    prefix,
+    loaded
+  ) {
     for await (const entry of dirHandle.values()) {
-      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const path = prefix
+        ? `${prefix}/${entry.name}`
+        : entry.name;
+
       if (ignored(path)) continue;
 
       if (entry.kind === "directory") {
-        if (["node_modules", ".git", "dist", "build", ".next", "coverage"].includes(entry.name)) continue;
-        await readDirectoryHandle(entry, path, loaded);
-        if (loaded.length >= MAX_FILES) return;
-      } else if (entry.kind === "file" && isProbablyText(entry.name)) {
+        if (
+          [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".next",
+            "coverage"
+          ].includes(entry.name)
+        ) {
+          continue;
+        }
+
+        await readDirectoryHandle(
+          entry,
+          path,
+          loaded
+        );
+
+        if (loaded.length >= MAX_FILES) {
+          return;
+        }
+      }
+
+      if (
+        entry.kind === "file" &&
+        isProbablyText(entry.name)
+      ) {
         try {
           const file = await entry.getFile();
-          if (file.size > MAX_FILE_CHARS * 2) continue;
+
+          if (
+            file.size >
+            MAX_FILE_CHARS * 2
+          ) {
+            continue;
+          }
+
           const text = await file.text();
+
           loaded.push({
             path,
-            content: text.slice(0, MAX_FILE_CHARS),
-            truncated: text.length > MAX_FILE_CHARS,
+            content: text.slice(
+              0,
+              MAX_FILE_CHARS
+            ),
+            truncated:
+              text.length > MAX_FILE_CHARS,
+
+            // KEEP THE WRITABLE HANDLE
             handle: entry
           });
-        } catch {}
+        } catch {
+          // Ignore unreadable files.
+        }
       }
-      if (loaded.length >= MAX_FILES) return;
-    }
-  }
 
-  function openProject() {
-    folderInput.current?.click();
+      if (loaded.length >= MAX_FILES) {
+        return;
+      }
+    }
   }
 
   function clearProject() {
     setFiles([]);
     setProjectName("");
     setSearchQuery("");
+    setSearchOpen(false);
     setSelectedSearch([]);
+    setEditRequest(null);
+    setEditText("");
+    setEditStatus("");
   }
 
-
+  /*
+   * Create an editing request.
+   *
+   * The important part is:
+   *
+   * handle: file.handle
+   *
+   * This fixes the previous read-only problem.
+   */
   function proposeEdit() {
     const path = selectedSearch[0]?.path;
-    const file = files.find(f => f.path === path);
+
+    const file = files.find(
+      (f) => f.path === path
+    );
+
     if (!file) {
-      setEditStatus("Select a file from Search project first.");
+      setEditStatus(
+        "Select a file from Search project first."
+      );
       return;
     }
-    setEditRequest({ path: file.path, original: file.content });
+
+    if (!file.handle) {
+      setEditStatus(
+        "This file was opened read-only. Close the project and reopen it with Chrome/Edge using Open project."
+      );
+      return;
+    }
+
+    setEditRequest({
+      path: file.path,
+      original: file.content,
+
+      // KEEP THE WRITABLE HANDLE
+      handle: file.handle
+    });
+
     setEditText(file.content);
-    setEditStatus("Review the proposed file contents before applying.");
+
+    setEditStatus(
+      "Review the proposed file before applying it."
+    );
   }
 
+  /*
+   * Actually writes the file.
+   *
+   * NOTHING is written until the user presses
+   * Apply Change.
+   */
   async function applyEdit() {
     if (!editRequest) return;
+
     try {
       const handle = editRequest.handle;
+
       if (!handle) {
         setEditStatus(
-          "This browser session indexed file contents read-only. Re-open the project with the file editor enabled to write changes."
+          "No writable file handle available. Re-open the project with Chrome or Edge."
         );
         return;
       }
-      const writable = await handle.createWritable();
+
+      const writable =
+        await handle.createWritable();
+
       await writable.write(editText);
+
       await writable.close();
-      setFiles(prev => prev.map(f =>
-        f.path === editRequest.path
-          ? { ...f, content: editText, truncated: false }
-          : f
-      ));
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.path === editRequest.path
+            ? {
+                ...f,
+                content: editText,
+                truncated: false
+              }
+            : f
+        )
+      );
+
+      const changedPath =
+        editRequest.path;
+
       setEditRequest(null);
-      setEditStatus(`Applied changes to ${editRequest.path}.`);
+
+      setEditStatus(
+        `✓ Applied changes to ${changedPath}`
+      );
     } catch (err) {
-      setEditStatus(`Could not write file: ${err.message}`);
+      setEditStatus(
+        `Could not write file: ${err.message}`
+      );
     }
   }
 
   async function send() {
     const text = input.trim();
+
     if (!text || busy) return;
 
-    const next = [...messages, { role: "user", content: text }];
+    const next = [
+      ...messages,
+      {
+        role: "user",
+        content: text
+      }
+    ];
+
     setMessages(next);
     setInput("");
     setBusy(true);
 
     const workspace = [];
-    let remaining = MAX_CONTEXT_CHARS;
-    const sourceFiles = selectedSearch.length
-      ? files.filter(f => selectedSearch.some(r => r.path === f.path))
-      : files;
+
+    let remaining =
+      MAX_CONTEXT_CHARS;
+
+    const sourceFiles =
+      selectedSearch.length
+        ? files.filter((f) =>
+            selectedSearch.some(
+              (r) => r.path === f.path
+            )
+          )
+        : files;
 
     for (const file of sourceFiles) {
       if (remaining <= 0) break;
-      const content = file.content.slice(0, remaining);
+
+      const content =
+        file.content.slice(
+          0,
+          remaining
+        );
+
       workspace.push({
         path: file.path,
         content,
-        truncated: file.truncated || content.length < file.content.length
+        truncated:
+          file.truncated ||
+          content.length <
+            file.content.length
       });
+
       remaining -= content.length;
     }
 
     try {
-      const res = await fetch(`${API}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: next,
-          workspace
-        })
-      });
+      const res = await fetch(
+        `${API}/api/chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body: JSON.stringify({
+            messages: next,
+            workspace
+          })
+        }
+      );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
 
-      setMessages([...next, { role: "assistant", content: data.text }]);
+      if (!res.ok) {
+        throw new Error(
+          data.error || "Request failed"
+        );
+      }
+
+      setMessages([
+        ...next,
+        {
+          role: "assistant",
+          content: data.text
+        }
+      ]);
     } catch (err) {
       setMessages([
         ...next,
-        { role: "assistant", content: `SEGA error: ${err.message}` }
+        {
+          role: "assistant",
+          content:
+            `SEGA error: ${err.message}`
+        }
       ]);
     } finally {
       setBusy(false);
@@ -314,7 +635,10 @@ function App() {
   }
 
   function onKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey
+    ) {
       e.preventDefault();
       send();
     }
@@ -322,72 +646,156 @@ function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">SEGA<span> AI</span></div>
 
-        <button className="new-chat" onClick={() => setMessages([])}>
+      <aside className="sidebar">
+
+        <div className="brand">
+          SEGA<span> AI</span>
+        </div>
+
+        <button
+          className="new-chat"
+          onClick={() =>
+            setMessages([])
+          }
+        >
           + New chat
         </button>
 
-        <button className="project-button" onClick={openProject}>
+        <button
+          className="project-button"
+          onClick={openProject}
+        >
           📁 Open project
         </button>
 
         <button
-          className={`search-project ${!files.length ? "disabled" : ""}`}
-          onClick={() => files.length && setSearchOpen(v => !v)}
+          className={`search-project ${
+            !files.length
+              ? "disabled"
+              : ""
+          }`}
+          onClick={() =>
+            files.length &&
+            setSearchOpen(
+              (v) => !v
+            )
+          }
           disabled={!files.length}
         >
           🔎 Search project
         </button>
 
-        {searchOpen && files.length > 0 && (
-          <div className="search-panel">
-            <input
-              autoFocus
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search code or filename..."
-            />
-            <div className="search-meta">
-              {searchQuery ? `${searchResults.length} matches` : "Type to search"}
-            </div>
-            <div className="search-results">
-              {searchResults.map((r, i) => (
-                <button
-                  key={`${r.path}:${r.line}:${i}`}
-                  className="search-result"
-                  onClick={() => setSelectedSearch(prev =>
-                    prev.some(x => x.path === r.path) ? prev : [...prev, r]
-                  )}
-                >
-                  <strong>{r.path}</strong>
-                  <span>Line {r.line}</span>
-                  <code>{r.text}</code>
-                </button>
-              ))}
-              {searchQuery && !searchResults.length && (
-                <div className="no-results">No matches found.</div>
-              )}
-            </div>
-            {selectedSearch.length > 0 && (
-              <div className="selected-search">
-                <div className="selected-title">Selected context</div>
-                {selectedSearch.map(r => (
-                  <button
-                    key={r.path}
-                    onClick={() => setSelectedSearch(prev => prev.filter(x => x.path !== r.path))}
-                  >
-                    {r.path} ×
-                  </button>
-                ))}
-                <button className="edit-selected" onClick={proposeEdit}>
-                  ✏️ Propose edit for selected file
-                </button>
+        {searchOpen &&
+          files.length > 0 && (
+            <div className="search-panel">
+
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) =>
+                  setSearchQuery(
+                    e.target.value
+                  )
+                }
+                placeholder="Search code or filename..."
+              />
+
+              <div className="search-meta">
+                {searchQuery
+                  ? `${searchResults.length} matches`
+                  : "Type to search"}
               </div>
-            )}
-          </div>
-        )}
+
+              <div className="search-results">
+
+                {searchResults.map(
+                  (r, i) => (
+                    <button
+                      key={`${r.path}:${r.line}:${i}`}
+                      className="search-result"
+                      onClick={() =>
+                        setSelectedSearch(
+                          (prev) =>
+                            prev.some(
+                              (x) =>
+                                x.path ===
+                                r.path
+                            )
+                              ? prev
+                              : [
+                                  ...prev,
+                                  r
+                                ]
+                        )
+                      }
+                    >
+                      <strong>
+                        {r.path}
+                      </strong>
+
+                      <span>
+                        Line {r.line}
+                      </span>
+
+                      <code>
+                        {r.text}
+                      </code>
+                    </button>
+                  )
+                )}
+
+                {searchQuery &&
+                  !searchResults.length && (
+                    <div className="no-results">
+                      No matches found.
+                    </div>
+                  )}
+
+              </div>
+
+              {selectedSearch.length >
+                0 && (
+                <div className="selected-search">
+
+                  <div className="selected-title">
+                    Selected context
+                  </div>
+
+                  {selectedSearch.map(
+                    (r) => (
+                      <button
+                        key={r.path}
+                        onClick={() =>
+                          setSelectedSearch(
+                            (prev) =>
+                              prev.filter(
+                                (x) =>
+                                  x.path !==
+                                  r.path
+                              )
+                          )
+                        }
+                      >
+                        {r.path} ×
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    className="edit-selected"
+                    onClick={
+                      proposeEdit
+                    }
+                  >
+                    ✏️ Propose edit for selected file
+                  </button>
+
+                </div>
+              )}
+
+            </div>
+          )}
 
         <input
           ref={folderInput}
@@ -396,7 +804,11 @@ function App() {
           multiple
           webkitdirectory=""
           directory=""
-          onChange={e => openFiles(e.target.files)}
+          onChange={(e) =>
+            openFiles(
+              e.target.files
+            )
+          }
         />
 
         <div className="nav">
@@ -407,141 +819,320 @@ function App() {
         </div>
 
         <div className="workspace">
+
           <div className="workspace-title">
-            <strong>{projectName || "No workspace"}</strong>
+
+            <strong>
+              {projectName ||
+                "No workspace"}
+            </strong>
+
             {files.length > 0 && (
-              <button onClick={clearProject} title="Close project">×</button>
+              <button
+                onClick={
+                  clearProject
+                }
+                title="Close project"
+              >
+                ×
+              </button>
             )}
+
           </div>
 
           {files.length > 0 ? (
             <>
-              <div className="file-count">{files.length} text files indexed</div>
+              <div className="file-count">
+                {files.length} text files indexed
+              </div>
+
               <div className="file-tree">
-                {tree.map(path => <div key={path}>📄 {path}</div>)}
+                {tree.map(
+                  (path) => (
+                    <div key={path}>
+                      📄 {path}
+                    </div>
+                  )
+                )}
               </div>
             </>
           ) : (
             <p className="workspace-help">
-              Open a local project folder. SEGA will index supported text files
-              in your browser and include relevant project context in chat.
+              Open a local project
+              folder. SEGA will
+              index supported text
+              files in your browser
+              and include relevant
+              project context in chat.
             </p>
           )}
+
         </div>
 
         <div className="side-note">
-          <strong>Agent roadmap</strong>
+
+          <strong>
+            Agent roadmap
+          </strong>
+
           <p>
-            Workspace context → code search → safe edits → tests → Git →
-            isolated command execution → subagents.
+            Workspace context →
+            code search → safe edits
+            → tests → Git → isolated
+            command execution →
+            subagents.
           </p>
+
         </div>
+
       </aside>
 
       <main className="main">
+
         <header>
+
           <div>
             <h1>SEGA</h1>
-            <p>Agentic coding assistant</p>
+            <p>
+              Agentic coding assistant
+            </p>
           </div>
-          <span className="status">● Ready</span>
+
+          <span className="status">
+            ● Ready
+          </span>
+
         </header>
 
         <section className="chat">
+
           {messages.length === 0 && (
             <div className="empty">
-              <div className="logo">S</div>
-              <h2>Build with SEGA</h2>
+
+              <div className="logo">
+                S
+              </div>
+
+              <h2>
+                Build with SEGA
+              </h2>
+
               <p>
-                Open a project, inspect its code, debug errors, and ask SEGA
-                about the architecture.
+                Open a project,
+                inspect its code,
+                debug errors, and ask
+                SEGA about the
+                architecture.
               </p>
+
             </div>
           )}
 
-          {messages.map((m, i) => (
-            <article key={i} className={`message ${m.role}`}>
-              <div className="avatar">{m.role === "assistant" ? "S" : "U"}</div>
-              <div className="bubble">
-                <div className="role">{m.role === "assistant" ? "SEGA" : "You"}</div>
-                <MarkdownMessage content={m.content} />
-              </div>
-            </article>
-          ))}
+          {messages.map(
+            (m, i) => (
+              <article
+                key={i}
+                className={`message ${m.role}`}
+              >
+
+                <div className="avatar">
+                  {m.role ===
+                  "assistant"
+                    ? "S"
+                    : "U"}
+                </div>
+
+                <div className="bubble">
+
+                  <div className="role">
+                    {m.role ===
+                    "assistant"
+                      ? "SEGA"
+                      : "You"}
+                  </div>
+
+                  <MarkdownMessage
+                    content={
+                      m.content
+                    }
+                  />
+
+                </div>
+
+              </article>
+            )
+          )}
 
           {busy && (
             <article className="message assistant">
-              <div className="avatar">S</div>
-              <div className="bubble">
-                <div className="role">SEGA</div>
-                <div className="thinking">Thinking…</div>
+
+              <div className="avatar">
+                S
               </div>
+
+              <div className="bubble">
+
+                <div className="role">
+                  SEGA
+                </div>
+
+                <div className="thinking">
+                  Thinking…
+                </div>
+
+              </div>
+
             </article>
           )}
+
         </section>
 
         <div className="composer">
-          {selectedSearch.length > 0 && (
+
+          {selectedSearch.length >
+            0 && (
             <div className="context-strip">
-              🔎 Using {selectedSearch.length} selected file{selectedSearch.length > 1 ? "s" : ""} as context
+              🔎 Using{" "}
+              {selectedSearch.length}{" "}
+              selected file
+              {selectedSearch.length >
+              1
+                ? "s"
+                : ""}{" "}
+              as context
             </div>
           )}
+
           <textarea
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={(e) =>
+              setInput(e.target.value)
+            }
             onKeyDown={onKeyDown}
             placeholder={
               files.length
-                ? `Ask SEGA about ${projectName || "your project"}…`
+                ? `Ask SEGA about ${
+                    projectName ||
+                    "your project"
+                  }…`
                 : "Ask SEGA to build, debug, review, or explain something…"
             }
             rows={3}
           />
+
           <div className="composer-bottom">
+
             <span>
               {files.length
                 ? `${files.length} files in workspace · Enter to send`
                 : "Enter to send · Shift+Enter for a new line"}
             </span>
-            <button onClick={send} disabled={busy || !input.trim()}>
-              {busy ? "Working…" : "Send ↑"}
+
+            <button
+              onClick={send}
+              disabled={
+                busy ||
+                !input.trim()
+              }
+            >
+              {busy
+                ? "Working…"
+                : "Send ↑"}
             </button>
+
           </div>
+
         </div>
 
         {editRequest && (
           <div className="edit-overlay">
+
             <div className="edit-modal">
+
               <div className="edit-modal-header">
+
                 <div>
-                  <strong>SEGA wants to modify</strong>
-                  <span>{editRequest.path}</span>
+
+                  <strong>
+                    SEGA wants to modify
+                  </strong>
+
+                  <span>
+                    {editRequest.path}
+                  </span>
+
                 </div>
-                <button onClick={() => setEditRequest(null)}>×</button>
+
+                <button
+                  onClick={() =>
+                    setEditRequest(
+                      null
+                    )
+                  }
+                >
+                  ×
+                </button>
+
               </div>
+
               <p className="edit-warning">
-                Review the complete file below. Nothing is written until you click Apply Change.
+                Review the complete
+                file below. Nothing is
+                written until you click
+                Apply Change.
               </p>
+
               <textarea
                 className="edit-textarea"
                 value={editText}
-                onChange={e => setEditText(e.target.value)}
+                onChange={(e) =>
+                  setEditText(
+                    e.target.value
+                  )
+                }
                 spellCheck={false}
               />
+
               <div className="edit-actions">
-                <button onClick={() => setEditRequest(null)}>Cancel</button>
-                <button className="apply-edit" onClick={applyEdit}>✓ Apply Change</button>
+
+                <button
+                  onClick={() =>
+                    setEditRequest(
+                      null
+                    )
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="apply-edit"
+                  onClick={applyEdit}
+                >
+                  ✓ Apply Change
+                </button>
+
               </div>
+
             </div>
+
           </div>
         )}
 
         {editStatus && (
-          <div className="edit-status" role="status">{editStatus}</div>
+          <div
+            className="edit-status"
+            role="status"
+          >
+            {editStatus}
+          </div>
         )}
+
       </main>
     </div>
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(
+  document.getElementById("root")
+).render(<App />);
