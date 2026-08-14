@@ -329,9 +329,8 @@ function cleanSEGAResponse(content) {
   return text.trim();
 }
 
-function MarkdownMessage({ content }) {
-  const cleanedContent =
-    cleanSEGAResponse(content);
+ffunction MarkdownMessage({ content }) {
+  const cleanedContent = cleanSEGAResponse(content);
 
   return (
     <div className="markdown">
