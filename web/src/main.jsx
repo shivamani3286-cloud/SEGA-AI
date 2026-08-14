@@ -692,6 +692,93 @@ function App() {
    *
    * This fixes the previous read-only problem.
    */
+ async function generateAIEdit() {
+  if (!editRequest || !editPrompt.trim()) {
+    setEditStatus("Describe what you want SEGA to change.");
+    return;
+  }
+
+  setEditBusy(true);
+  setEditStatus("SEGA is analyzing the file...");
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: `
+You are editing an existing project file.
+
+FILE PATH:
+${editRequest.path}
+
+ORIGINAL FILE:
+---BEGIN FILE---
+${editRequest.original}
+---END FILE---
+
+USER REQUEST:
+${editPrompt}
+
+Return ONLY the complete modified file contents.
+
+Do not use Markdown.
+Do not use triple backticks.
+Do not add explanations.
+Do not add the filename.
+Do not add "Copy".
+Do not omit unchanged sections.
+
+Preserve everything that does not need to change.
+`
+          }
+        ],
+        workspace: [
+          {
+            path: editRequest.path,
+            content: editRequest.original
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error || "SEGA failed to generate the edit."
+      );
+    }
+
+    let proposed = String(data?.text || "").trim();
+
+    // Remove accidental Markdown fences if Gemini ignores the instruction.
+    proposed = proposed
+      .replace(/^```[a-zA-Z0-9_-]*\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    if (!proposed) {
+      throw new Error("SEGA returned an empty edit.");
+    }
+
+    setEditText(proposed);
+    setEditStatus("Edit generated. Review it before applying.");
+  } catch (error) {
+    console.error("SEGA edit error:", error);
+    setEditStatus(
+      error?.message || "SEGA could not generate the edit."
+    );
+  } finally {
+    setEditBusy(false);
+  }
+}
+  
   function proposeEdit() {
     const path = selectedSearch[0]?.path;
 
