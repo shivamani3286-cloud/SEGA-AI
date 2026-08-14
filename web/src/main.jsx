@@ -911,7 +911,7 @@ STRICT OUTPUT RULES:
   }
 }
 
-  function applyAIEdit() {
+function applyAIEdit() {
   if (!editRequest || !editText.trim()) {
     setEditStatus("No generated edit is available.");
     return;
@@ -930,10 +930,11 @@ STRICT OUTPUT RULES:
     )
   );
 
- 
-
   setEditStatus("✓ Changes applied successfully.");
-}function undoAIEdit() {
+}
+  
+}
+function undoAIEdit() {
   if (!editRequest) {
     setEditStatus("Nothing to undo.");
     return;
