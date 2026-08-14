@@ -384,24 +384,25 @@ header p {
   font-size: 0.9em;
 }
 
-/* Code blocks */
+/* =========================================
+   SEGA CODE BLOCK
+   ========================================= */
 
 .code-block {
-  margin: 14px 0 18px;
+  margin: 16px 0 20px;
   border: 1px solid #303038;
   border-radius: 10px;
   overflow: hidden;
-  background: #0e0e12;
-  box-shadow:
-    0 5px 20px rgba(0, 0, 0, 0.18);
+  background: #0d0d10;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
 }
 
 .code-header {
-  min-height: 38px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px 0 13px;
+  padding: 0 12px 0 14px;
   border-bottom: 1px solid #292930;
   background: #17171c;
 }
@@ -409,29 +410,34 @@ header p {
 .code-language {
   font-size: 12px;
   font-weight: 600;
-  color: #a9a9b3;
+  color: #b8b8c2;
 }
 
 .copy-code {
   border: 1px solid #383840;
   border-radius: 6px;
-  padding: 5px 9px;
+  padding: 5px 10px;
   background: #202027;
-  color: #dddde4;
+  color: #ddddE5;
   font-size: 12px;
   cursor: pointer;
 }
 
 .copy-code:hover {
-  background: #2a2a32;
+  background: #2b2b33;
+  border-color: #50505a;
 }
 
-.code-content {
-  margin: 0 !important;
-  padding: 14px 15px !important;
+.code-body {
   overflow-x: auto;
-  background: #0d0d10 !important;
-  color: #e8e8ed !important;
+  background: #0d0d10;
+}
+
+.code-body pre {
+  margin: 0 !important;
+}
+
+.code-body code {
   font-family:
     ui-monospace,
     SFMono-Regular,
@@ -439,13 +445,6 @@ header p {
     Monaco,
     Consolas,
     monospace !important;
-  font-size: 13px !important;
-  line-height: 1.6 !important;
-  white-space: pre !important;
-}
-
-.code-content code {
-  font-family: inherit;
 }
 
 /* Search */
