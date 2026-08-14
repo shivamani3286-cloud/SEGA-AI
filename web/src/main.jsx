@@ -1333,7 +1333,30 @@ Preserve everything that does not need to change.
               as context
             </div>
           )}
+<div className="edit-request-box">
+  <label className="edit-request-label">
+    What should SEGA change?
+  </label>
 
+  <textarea
+    className="edit-request-input"
+    value={editPrompt}
+    onChange={(e) => setEditPrompt(e.target.value)}
+    placeholder="Example: Change Node 20 to Node 22 and use npm ci."
+    rows={3}
+    disabled={editBusy}
+  />
+
+  <button
+    className="edit-generate-button"
+    onClick={generateAIEdit}
+    disabled={editBusy || !editPrompt.trim()}
+    type="button"
+  >
+    {editBusy ? "SEGA is thinking..." : "Generate Edit"}
+  </button>
+</div>
+          
           <textarea
             value={input}
             onChange={(e) =>
