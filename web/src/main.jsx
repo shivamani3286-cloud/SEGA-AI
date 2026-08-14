@@ -489,6 +489,8 @@ function App() {
   const [editRequest, setEditRequest] = useState(null);
   const [editText, setEditText] = useState("");
   const [editStatus, setEditStatus] = useState("");
+  const [editPrompt, setEditPrompt] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   const folderInput = useRef(null);
 
