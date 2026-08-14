@@ -693,29 +693,72 @@ function App() {
    * This fixes the previous read-only problem.
    */
  async function generateAIEdit() {
-  if (!editRequest) {
-    setEditStatus("No file selected for editing.");
-    return;
+  let request = editRequest;
+
+  /*
+   * If no edit request exists yet, automatically
+   * create one from the selected search result.
+   */
+  if (!request) {
+    const selectedPath = selectedSearch[0]?.path;
+
+    if (!selectedPath) {
+      setEditStatus(
+        "Select a file from Search project first."
+      );
+      return;
+    }
+
+    const file = files.find(
+      (f) => f.path === selectedPath
+    );
+
+    if (!file) {
+      setEditStatus(
+        "Selected file could not be found."
+      );
+      return;
+    }
+
+    if (!file.handle) {
+      setEditStatus(
+        "This file is read-only. Re-open the project with Chrome or Edge using Open project."
+      );
+      return;
+    }
+
+    request = {
+      path: file.path,
+      original: file.content,
+      handle: file.handle
+    };
+
+    setEditRequest(request);
+    setEditText(file.content);
   }
 
   if (!editPrompt.trim()) {
-    setEditStatus("Describe what you want SEGA to change.");
+    setEditStatus(
+      "Describe what you want SEGA to change."
+    );
     return;
   }
 
   setEditBusy(true);
-  setEditStatus("SEGA is thinking...");
+  setEditStatus(
+    `SEGA is modifying ${request.path}...`
+  );
 
   try {
     const prompt = `
 You are modifying an existing project file.
 
 FILE PATH:
-${editRequest.path}
+${request.path}
 
 CURRENT FILE:
 ---BEGIN FILE---
-${editRequest.original}
+${request.original}
 ---END FILE---
 
 USER REQUEST:
@@ -725,62 +768,55 @@ TASK:
 Modify the current file according to the user's request.
 
 STRICT OUTPUT RULES:
+
 1. Return ONLY the complete modified file.
-2. Return the entire file, including unchanged sections.
+2. Return the entire file.
 3. Do NOT explain anything.
-4. Do NOT add comments about what you changed unless they are part of the requested code.
-5. Do NOT add a filename heading.
-6. Do NOT write "Copy".
-7. Do NOT use Markdown outside the file.
-8. Do NOT use triple backticks.
-9. Preserve everything that does not need to change.
-10. Make only the changes required by the user's request.
+4. Do NOT add a filename heading.
+5. Do NOT write "Copy".
+6. Do NOT use Markdown.
+7. Do NOT use triple backticks.
+8. Preserve everything that does not need to change.
+9. Make only the changes required by the user's request.
 `;
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        workspace: [
-          {
-            path: editRequest.path,
-            content: editRequest.original
-          }
-        ]
-      })
-    });
+    const response = await fetch(
+      "/api/chat",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          workspace: [
+            {
+              path: request.path,
+              content: request.original
+            }
+          ]
+        })
+      }
+    );
 
-    /*
-     * Read the response as text first.
-     * This prevents:
-     *
-     * Unexpected token '<'
-     * Unexpected token 'A'
-     *
-     * when Vercel returns an HTML/error response.
-     */
-    const rawResponse = await response.text();
+    const rawResponse =
+      await response.text();
 
     let data;
 
     try {
-      data = JSON.parse(rawResponse);
-    } catch {
-      console.error(
-        "SEGA returned non-JSON response:",
+      data = JSON.parse(
         rawResponse
       );
-
+    } catch {
       throw new Error(
-        `Server returned an invalid response (HTTP ${response.status}).`
+        `Server returned invalid JSON (HTTP ${response.status}).`
       );
     }
 
@@ -802,49 +838,44 @@ STRICT OUTPUT RULES:
     }
 
     /*
-     * Gemini may ignore the "no Markdown" instruction
-     * and return:
-     *
-     * ```dockerfile
-     * FROM node:22-alpine
-     * ```
-     *
-     * Extract only the actual file contents.
+     * Remove Markdown code fences if Gemini
+     * accidentally returns them.
      */
-    const fencedMatch = proposed.match(
-      /^```[^\n]*\n([\s\S]*?)\n```$/
-    );
+    const fencedMatch =
+      proposed.match(
+        /^```[^\n]*\n([\s\S]*?)\n```$/
+      );
 
     if (fencedMatch) {
-      proposed = fencedMatch[1].trim();
+      proposed =
+        fencedMatch[1].trim();
     }
 
     /*
-     * Remove a filename heading if Gemini adds one.
-     *
-     * Example:
-     *
-     * ### Dockerfile
-     * FROM node:22-alpine
-     *
-     * becomes:
-     *
-     * FROM node:22-alpine
+     * Remove accidental filename heading.
      */
-    const fileName = editRequest.path
-      .split("/")
-      .pop();
+    const fileName =
+      request.path
+        .split("/")
+        .pop();
 
-    const escapedFileName = fileName
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedFileName =
+      fileName.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
 
-    const headingPattern = new RegExp(
-      `^(?:#{1,6}\\s*|\\*\\*)${escapedFileName}(?:\\*\\*)?\\s*\\n+`,
-      "i"
-    );
+    const headingPattern =
+      new RegExp(
+        `^(?:#{1,6}\\s*|\\*\\*)${escapedFileName}(?:\\*\\*)?\\s*\\n+`,
+        "i"
+      );
 
     proposed = proposed
-      .replace(headingPattern, "")
+      .replace(
+        headingPattern,
+        ""
+      )
       .trim();
 
     if (!proposed) {
@@ -854,15 +885,12 @@ STRICT OUTPUT RULES:
     }
 
     /*
-     * Put the generated complete file into the
-     * editable textarea.
-     *
-     * NOTHING is written to disk here.
+     * Put the generated code into the editor.
      */
     setEditText(proposed);
 
     setEditStatus(
-      "✓ Edit generated. Review the complete file before applying."
+      `✓ Edit generated for ${request.path}. Review it before applying.`
     );
 
   } catch (error) {
@@ -882,7 +910,6 @@ STRICT OUTPUT RULES:
     setEditBusy(false);
   }
 }
-  
   function proposeEdit() {
     const path = selectedSearch[0]?.path;
 
