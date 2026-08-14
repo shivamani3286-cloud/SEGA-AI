@@ -910,6 +910,57 @@ STRICT OUTPUT RULES:
     setEditBusy(false);
   }
 }
+  function applyAIEdit() {
+  if (!editRequest || !editText.trim()) {
+    setEditStatus("No generated edit is available.");
+    return;
+  }
+
+  const updatedContent = editText;
+
+  setFiles((currentFiles) =>
+    currentFiles.map((file) =>
+      file.path === editRequest.path
+        ? {
+            ...file,
+            content: updatedContent
+          }
+        : file
+    )
+  );
+
+  setEditRequest((current) =>
+    current
+      ? {
+          ...current,
+          original: updatedContent
+        }
+      : current
+  );
+
+  setEditStatus("✓ Changes applied successfully.");
+}function undoAIEdit() {
+  if (!editRequest) {
+    setEditStatus("Nothing to undo.");
+    return;
+  }
+
+  const originalContent = editRequest.original;
+
+  setFiles((currentFiles) =>
+    currentFiles.map((file) =>
+      file.path === editRequest.path
+        ? {
+            ...file,
+            content: originalContent
+          }
+        : file
+    )
+  );
+
+  setEditText(originalContent);
+  setEditStatus("↶ Changes reverted.");
+}
   function proposeEdit() {
     const path = selectedSearch[0]?.path;
 
