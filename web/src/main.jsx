@@ -2,6 +2,8 @@ import React, { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "./styles.css";
 
 const API = "";
@@ -121,7 +123,11 @@ function languageLabel(language) {
 }
 
 function CodeBlock({ inline, className, children }) {
-  const language = (className || "").replace("language-", "").trim();
+  const language = (className || "")
+    .replace("language-", "")
+    .trim()
+    .toLowerCase();
+
   const code = String(children).replace(/\n$/, "");
 
   if (inline) {
@@ -150,14 +156,38 @@ function CodeBlock({ inline, className, children }) {
           {languageLabel(language)}
         </span>
 
-        <button className="copy-code" onClick={copyCode}>
+        <button
+          className="copy-code"
+          onClick={copyCode}
+          type="button"
+        >
           {copied ? "✓ Copied" : "Copy"}
         </button>
       </div>
 
-      <pre className="code-content">
-        <code>{code}</code>
-      </pre>
+      <div className="code-body">
+        <SyntaxHighlighter
+          language={language || "text"}
+          style={vscDarkPlus}
+          showLineNumbers
+          wrapLongLines={false}
+          customStyle={{
+            margin: 0,
+            padding: "16px",
+            background: "transparent",
+            fontSize: "13px",
+            lineHeight: "1.6"
+          }}
+          lineNumberStyle={{
+            minWidth: "3em",
+            paddingRight: "14px",
+            color: "#666672",
+            userSelect: "none"
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
     </div>
   );
 }
