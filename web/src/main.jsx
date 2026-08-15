@@ -932,8 +932,6 @@ function applyAIEdit() {
 
   setEditStatus("✓ Changes applied successfully.");
 }
-  
-}
 function undoAIEdit() {
   if (!editRequest) {
     setEditStatus("Nothing to undo.");
