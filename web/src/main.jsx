@@ -564,6 +564,7 @@ function App() {
   const [editStatus, setEditStatus] = useState("");
   const [editPrompt, setEditPrompt] = useState("");
   const [editBusy, setEditBusy] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
 
   const folderInput = useRef(null);
 
