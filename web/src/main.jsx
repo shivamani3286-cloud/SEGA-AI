@@ -1698,46 +1698,44 @@ function undoAIEdit() {
                 spellCheck={false}
               />
 
-              <div className="edit-actions">
+           <div className="edit-actions">
+  <button
+    type="button"
+    className="edit-diff-button"
+    onClick={() => setShowDiff((value) => !value)}
+    disabled={!editText.trim()}
+  >
+    {showDiff ? "Hide Diff" : "View Diff"}
+  </button>
 
-                <button
-                  onClick={() =>
-                    setEditRequest(
-                      null
-                    )
-                  }
-                >
-                  Cancel
-                </button>
+  <button
+    type="button"
+    className="edit-apply-button"
+    onClick={applyAIEdit}
+    disabled={editBusy || !editText.trim()}
+  >
+    ✓ Apply Change
+  </button>
 
-                <button
-                  className="apply-edit"
-                  onClick={applyEdit}
-                >
-                  ✓ Apply Change
-                </button>
+  <button
+    type="button"
+    className="edit-undo-button"
+    onClick={undoAIEdit}
+    disabled={editBusy || !editText.trim()}
+  >
+    ↶ Undo
+  </button>
 
-              </div>
-
-            </div>
-
-          </div>
-        )}
-
-        {editStatus && (
-          <div
-            className="edit-status"
-            role="status"
-          >
-            {editStatus}
-          </div>
-        )}
-
-      </main>
-    </div>
-  );
-}
-
-createRoot(
-  document.getElementById("root")
-).render(<App />);
+  <button
+    type="button"
+    className="edit-cancel-button"
+    onClick={() => {
+      setEditRequest(null);
+      setEditText("");
+      setEditStatus("");
+      setShowDiff(false);
+    }}
+  >
+    Cancel
+  </button>
+</div>
