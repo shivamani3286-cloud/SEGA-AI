@@ -1650,98 +1650,110 @@ function undoAIEdit() {
 
         </div>
 
-        {editRequest && (
-          <div className="edit-overlay">
+       {editRequest && (
+  <div className="edit-overlay">
 
-            <div className="edit-modal">
+    <div className="edit-modal">
 
-              <div className="edit-modal-header">
+      <div className="edit-modal-header">
 
-                <div>
+        <div>
+          <strong>
+            SEGA wants to modify
+          </strong>
 
-                  <strong>
-                    SEGA wants to modify
-                  </strong>
+          <span>
+            {editRequest.path}
+          </span>
+        </div>
 
-                  <span>
-                    {editRequest.path}
-                  </span>
+        <button
+          type="button"
+          onClick={() => {
+            setEditRequest(null);
+            setEditText("");
+            setEditStatus("");
+            setShowDiff(false);
+          }}
+        >
+          ×
+        </button>
 
-                </div>
+      </div>
 
-                <button
-                  onClick={() =>
-                    setEditRequest(
-                      null
-                    )
-                  }
-                >
-                  ×
-                </button>
+      <p className="edit-warning">
+        Review the complete file below. Nothing is
+        written until you click Apply Change.
+      </p>
 
-              </div>
+      <textarea
+        className="edit-textarea"
+        value={editText}
+        onChange={(e) =>
+          setEditText(e.target.value)
+        }
+        spellCheck={false}
+      />
 
-              <p className="edit-warning">
-                Review the complete
-                file below. Nothing is
-                written until you click
-                Apply Change.
-              </p>
+      <div className="edit-actions">
 
-              <textarea
-                className="edit-textarea"
-                value={editText}
-                onChange={(e) =>
-                  setEditText(
-                    e.target.value
-                  )
-                }
-                spellCheck={false}
-              />
+        <button
+          type="button"
+          className="edit-diff-button"
+          onClick={() =>
+            setShowDiff((value) => !value)
+          }
+          disabled={!editText.trim()}
+        >
+          {showDiff ? "Hide Diff" : "View Diff"}
+        </button>
 
-           <div className="edit-actions">
-  <button
-    type="button"
-    className="edit-diff-button"
-    onClick={() => setShowDiff((value) => !value)}
-    disabled={!editText.trim()}
-  >
-    {showDiff ? "Hide Diff" : "View Diff"}
-  </button>
+        <button
+          type="button"
+          className="edit-apply-button"
+          onClick={applyAIEdit}
+          disabled={
+            editBusy ||
+            !editText.trim()
+          }
+        >
+          ✓ Apply Change
+        </button>
 
-  <button
-    type="button"
-    className="edit-apply-button"
-    onClick={applyAIEdit}
-    disabled={editBusy || !editText.trim()}
-  >
-    ✓ Apply Change
-  </button>
+        <button
+          type="button"
+          className="edit-undo-button"
+          onClick={undoAIEdit}
+          disabled={
+            editBusy ||
+            !editText.trim()
+          }
+        >
+          ↶ Undo
+        </button>
 
-  <button
-    type="button"
-    className="edit-undo-button"
-    onClick={undoAIEdit}
-    disabled={editBusy || !editText.trim()}
-  >
-    ↶ Undo
-  </button>
+        <button
+          type="button"
+          className="edit-cancel-button"
+          onClick={() => {
+            setEditRequest(null);
+            setEditText("");
+            setEditStatus("");
+            setShowDiff(false);
+          }}
+        >
+          Cancel
+        </button>
 
-  <button
-    type="button"
-    className="edit-cancel-button"
-    onClick={() => {
-      setEditRequest(null);
-      setEditText("");
-      setEditStatus("");
-      setShowDiff(false);
-    }}
-  >
-    Cancel
-  </button>
-</div>
-{editStatus && (
-  <div className="edit-status">
-    {editStatus}
+      </div>
+
+      {editStatus && (
+        <div className="edit-status">
+          {editStatus}
+        </div>
+      )}
+
+    </div>
+
   </div>
 )}
