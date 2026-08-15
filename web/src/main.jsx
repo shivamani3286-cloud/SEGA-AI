@@ -503,6 +503,42 @@ function searchFiles(files, query) {
 
   return results;
 }
+function createDiff(original, proposed) {
+  const oldLines = String(original || "").split(/\r?\n/);
+  const newLines = String(proposed || "").split(/\r?\n/);
+
+  const max = Math.max(oldLines.length, newLines.length);
+  const diff = [];
+
+  for (let i = 0; i < max; i++) {
+    const oldLine = oldLines[i];
+    const newLine = newLines[i];
+
+    if (oldLine === newLine) {
+      diff.push({
+        type: "same",
+        oldLine,
+        newLine
+      });
+    } else {
+      if (oldLine !== undefined) {
+        diff.push({
+          type: "removed",
+          oldLine
+        });
+      }
+
+      if (newLine !== undefined) {
+        diff.push({
+          type: "added",
+          newLine
+        });
+      }
+    }
+  }
+
+  return diff;
+}
 
 function App() {
   const [messages, setMessages] = useState([
