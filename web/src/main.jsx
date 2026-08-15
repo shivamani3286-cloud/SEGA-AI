@@ -1740,3 +1740,8 @@ function undoAIEdit() {
     Cancel
   </button>
 </div>
+{editStatus && (
+  <div className="edit-status">
+    {editStatus}
+  </div>
+)}
