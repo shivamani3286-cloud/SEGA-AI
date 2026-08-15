@@ -884,16 +884,22 @@ STRICT OUTPUT RULES:
 
     let data;
 
-    try {
-      data = JSON.parse(
-        rawResponse
-      );
-    } catch {
-      throw new Error(
-        `Server returned invalid JSON (HTTP ${response.status}).`
-      );
-    }
+   try {
+  data = JSON.parse(
+    rawResponse
+  );
+} catch {
+  throw new Error(
+    `Server returned invalid JSON (HTTP ${response.status}).`
+  );
+}
 
+if (!response.ok) {
+  throw new Error(
+    data?.error ||
+    `SEGA request failed with HTTP ${response.status}.`
+  );
+}
     if (!response.ok) {
       throw new Error(
         data?.error ||
