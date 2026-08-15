@@ -900,12 +900,7 @@ if (!response.ok) {
     `SEGA request failed with HTTP ${response.status}.`
   );
 }
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-        `SEGA request failed with HTTP ${response.status}.`
-      );
-    }
+
 
     let proposed = String(
       data?.text || ""
