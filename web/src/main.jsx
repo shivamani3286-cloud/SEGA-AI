@@ -76,9 +76,12 @@ function ignored(path) {
 async function readEntry(file) {
   const text = await file.text();
 
+  const content = text.slice(0, MAX_FILE_CHARS);
+
   return {
     path: file.webkitRelativePath || file.name,
-    content: text.slice(0, MAX_FILE_CHARS),
+    content,
+    originalContent: content,
     truncated: text.length > MAX_FILE_CHARS,
     handle: null
   };
@@ -494,6 +497,9 @@ function App() {
   const [showDiff, setShowDiff] = useState(false);
   const [editApplied, setEditApplied] = useState(false);
 
+  const [showWorkspaceChanges, setShowWorkspaceChanges] = useState(false);
+  const [selectedWorkspaceChange, setSelectedWorkspaceChange] = useState(null);
+
   const folderInput = useRef(null);
 
   const tree = useMemo(
@@ -504,6 +510,16 @@ function App() {
   const searchResults = useMemo(
     () => searchFiles(files, searchQuery),
     [files, searchQuery]
+  );
+
+  const workspaceChanges = useMemo(
+    () =>
+      files.filter(
+        (file) =>
+          typeof file.originalContent === "string" &&
+          file.content !== file.originalContent
+      ),
+    [files]
   );
 
   /*
@@ -651,12 +667,15 @@ function App() {
 
           const text = await file.text();
 
+          const content = text.slice(
+            0,
+            MAX_FILE_CHARS
+          );
+
           loaded.push({
             path,
-            content: text.slice(
-              0,
-              MAX_FILE_CHARS
-            ),
+            content,
+            originalContent: content,
             truncated:
               text.length > MAX_FILE_CHARS,
 
@@ -684,6 +703,8 @@ function App() {
     setEditText("");
     setEditStatus("");
     setEditApplied(false);
+    setShowWorkspaceChanges(false);
+    setSelectedWorkspaceChange(null);
   }
 
   /*
@@ -1272,6 +1293,25 @@ async function undoAIEdit() {
           🔎 Search project
         </button>
 
+        <button
+          className={`workspace-changes-button ${
+            !files.length
+              ? "disabled"
+              : ""
+          }`}
+          onClick={() =>
+            files.length &&
+            setShowWorkspaceChanges(
+              (value) => !value
+            )
+          }
+          disabled={!files.length}
+        >
+          {workspaceChanges.length > 0
+            ? `↕ Workspace Changes (${workspaceChanges.length})`
+            : "↕ Workspace Changes"}
+        </button>
+
         {searchOpen &&
           files.length > 0 && (
             <div className="search-panel">
@@ -1396,6 +1436,48 @@ async function undoAIEdit() {
             )
           }
         />
+
+        {showWorkspaceChanges && files.length > 0 && (
+          <div className="workspace-changes-panel">
+            <div className="workspace-changes-header">
+              <strong>Workspace Changes</strong>
+              <span>
+                {workspaceChanges.length
+                  ? `${workspaceChanges.length} modified`
+                  : "No changes"}
+              </span>
+            </div>
+
+            {workspaceChanges.length > 0 ? (
+              <div className="workspace-changes-list">
+                {workspaceChanges.map((file) => (
+                  <button
+                    key={file.path}
+                    type="button"
+                    className="workspace-change-item"
+                    onClick={() =>
+                      setSelectedWorkspaceChange(file)
+                    }
+                  >
+                    <span className="workspace-change-icon">
+                      M
+                    </span>
+                    <span className="workspace-change-path">
+                      {file.path}
+                    </span>
+                    <span className="workspace-change-arrow">
+                      ›
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="workspace-changes-empty">
+                No unsaved workspace changes.
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="nav">
           <div>⌘ Projects</div>
@@ -1653,7 +1735,139 @@ async function undoAIEdit() {
 
         </div>
 
-       {editRequest && (
+       {selectedWorkspaceChange && (
+  <div className="edit-overlay workspace-change-overlay">
+    <div className="edit-modal workspace-change-modal">
+      <div className="edit-modal-header">
+        <div>
+          <strong>Workspace change</strong>
+          <span>{selectedWorkspaceChange.path}</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedWorkspaceChange(null)
+          }
+        >
+          ×
+        </button>
+      </div>
+
+      <p className="edit-warning">
+        This is the difference between the file when the
+        project was opened and its current browser workspace content.
+      </p>
+
+      <div className="workspace-change-diff">
+        <div className="diff-viewer-header">
+          <div>
+            <strong>Changes</strong>
+            <span>Original vs current workspace</span>
+          </div>
+        </div>
+
+        <div className="diff-summary">
+          {(() => {
+            const diff = createDiff(
+              selectedWorkspaceChange.originalContent,
+              selectedWorkspaceChange.content
+            );
+
+            const added = diff.filter(
+              (item) => item.type === "added"
+            ).length;
+
+            const removed = diff.filter(
+              (item) => item.type === "removed"
+            ).length;
+
+            return (
+              <>
+                <span className="diff-added-count">
+                  +{added} added
+                </span>
+                <span className="diff-removed-count">
+                  −{removed} removed
+                </span>
+              </>
+            );
+          })()}
+        </div>
+
+        <div className="diff-columns">
+          <div className="diff-column">
+            <div className="diff-column-title original">
+              Original
+            </div>
+
+            <div className="diff-code">
+              {createDiff(
+                selectedWorkspaceChange.originalContent,
+                selectedWorkspaceChange.content
+              ).map((item, index) => (
+                <div
+                  key={`workspace-old-${index}`}
+                  className={`diff-line diff-line-${item.type}`}
+                >
+                  <span className="diff-prefix">
+                    {item.type === "removed" ? "−" : " "}
+                  </span>
+                  <code>
+                    {item.type === "added"
+                      ? ""
+                      : item.text}
+                  </code>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="diff-column">
+            <div className="diff-column-title proposed">
+              Current
+            </div>
+
+            <div className="diff-code">
+              {createDiff(
+                selectedWorkspaceChange.originalContent,
+                selectedWorkspaceChange.content
+              ).map((item, index) => (
+                <div
+                  key={`workspace-new-${index}`}
+                  className={`diff-line diff-line-${item.type}`}
+                >
+                  <span className="diff-prefix">
+                    {item.type === "added" ? "+" : " "}
+                  </span>
+                  <code>
+                    {item.type === "removed"
+                      ? ""
+                      : item.text}
+                  </code>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="edit-actions">
+        <button
+          type="button"
+          className="edit-cancel-button"
+          onClick={() =>
+            setSelectedWorkspaceChange(null)
+          }
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{editRequest && (
   <div className="edit-overlay">
 
     <div className="edit-modal">
