@@ -802,3 +802,129 @@ textarea::placeholder { color: #6e6e76; }
   font-size: 10px;
   line-height: 1.5;
 }
+
+/* ==========================================
+   SEGA Job Agent
+   ========================================== */
+.job-agent-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #3a3030;
+  border-radius: 9px;
+  background: #1a1515;
+  color: #f0dada;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.job-agent-button:hover { background: #241b1b; }
+.job-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(5px);
+}
+.job-modal {
+  width: min(1050px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  border: 1px solid #34343c;
+  border-radius: 16px;
+  background: #101014;
+  box-shadow: 0 30px 100px rgba(0,0,0,.55);
+  padding: 20px;
+}
+.job-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #292930;
+}
+.job-header strong { display:block; font-size: 18px; color:#f5f5f5; }
+.job-header span { display:block; margin-top:4px; color:#888892; font-size:12px; }
+.job-header button { border:0; background:transparent; color:#888892; font-size:22px; cursor:pointer; }
+.job-form-grid {
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:10px;
+  margin-top:16px;
+}
+.job-form-grid input, .job-query {
+  width:100%;
+  border:1px solid #303038;
+  border-radius:9px;
+  background:#17171c;
+  color:#f5f5f5;
+  padding:10px 11px;
+  outline:none;
+}
+.job-form-grid input:focus, .job-query:focus { border-color:#5b5b68; }
+.job-query { margin-top:10px; resize:vertical; }
+.job-resume-row {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+  color:#888892;
+  font-size:11px;
+}
+.job-secondary-button {
+  border:1px solid #34343c;
+  border-radius:8px;
+  background:#19191e;
+  color:#dddde3;
+  padding:9px 12px;
+  cursor:pointer;
+}
+.job-actions { display:flex; gap:10px; margin-top:12px; }
+.job-actions button {
+  border:0;
+  border-radius:9px;
+  padding:10px 14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.job-search-button { background:#f2f2f2; color:#111; }
+.job-apply-button { background:#79c99a; color:#0b160e; }
+.job-actions button:disabled { opacity:.45; cursor:not-allowed; }
+.job-status {
+  margin-top:12px;
+  padding:10px 12px;
+  border:1px solid #2c2c34;
+  border-radius:9px;
+  color:#c9c9d1;
+  background:#141419;
+  font-size:12px;
+  line-height:1.5;
+}
+.job-list { display:grid; gap:10px; margin-top:14px; }
+.job-card {
+  border:1px solid #2a2a31;
+  border-radius:11px;
+  padding:13px;
+  background:#141419;
+}
+.job-card.selected { border-color:#676774; background:#18181e; }
+.job-select-row { display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:10px; cursor:pointer; }
+.job-select-row input { width:16px; height:16px; }
+.job-select-row strong { display:block; color:#f0f0f4; font-size:14px; }
+.job-select-row span { display:block; color:#8e8e98; font-size:11px; margin-top:3px; }
+.job-select-row b { color:#9bd9ae; font-size:14px; }
+.job-card p { color:#a8a8b1; font-size:12px; line-height:1.5; margin:10px 0; }
+.job-meta { display:flex; flex-wrap:wrap; gap:8px; color:#777782; font-size:10px; }
+.job-meta span { border:1px solid #292930; border-radius:999px; padding:4px 7px; }
+.job-card a { display:inline-block; margin-top:9px; color:#b7b7ff; font-size:11px; }
+.job-result-message { margin-top:8px; color:#d0b889; font-size:11px; line-height:1.45; }
+.job-disclaimer { margin-top:14px; padding-top:12px; border-top:1px solid #292930; color:#6f6f79; font-size:10px; line-height:1.5; }
+@media (max-width: 700px) {
+  .job-form-grid { grid-template-columns:1fr; }
+  .job-actions { flex-direction:column; }
+  .job-resume-row { align-items:flex-start; flex-direction:column; }
+}
