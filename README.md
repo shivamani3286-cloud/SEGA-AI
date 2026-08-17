@@ -79,3 +79,39 @@ The AI is instructed to put a file name immediately above complete files, for ex
 ```dockerfile
 FROM nginx:alpine
 ```
+SEGA Local Agent
+
+This small local service gives the SEGA web app safe, read-only access to Git status and Git diff.
+
+Start it
+
+Open Git Bash in the root of the Git repository you want SEGA to inspect:
+
+node local-agent/server.js
+
+The agent listens only on:
+
+http://127.0.0.1:8787
+
+It does not expose arbitrary shell commands.
+
+Endpoints
+
+GET /health
+GET /git/status
+GET /git/diff
+
+The service runs Git with the current working directory as the repository.
+
+To point it at another repository:
+
+Git Bash
+
+SEGA_PROJECT_DIR="C:/path/to/your/repository" node local-agent/server.js
+
+PowerShell
+
+$env:SEGA_PROJECT_DIR="C:\path\to\your\repository"
+node local-agent/server.js
+
+Keep the terminal running while using the Git features in SEGA.
