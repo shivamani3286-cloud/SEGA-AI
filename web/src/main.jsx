@@ -500,6 +500,11 @@ function App() {
   const [showWorkspaceChanges, setShowWorkspaceChanges] = useState(false);
   const [selectedWorkspaceChange, setSelectedWorkspaceChange] = useState(null);
 
+  const [gitStatus, setGitStatus] = useState(null);
+  const [gitDiff, setGitDiff] = useState("");
+  const [gitBusy, setGitBusy] = useState(false);
+  const [gitPanelOpen, setGitPanelOpen] = useState(false);
+
   const folderInput = useRef(null);
 
   const tree = useMemo(
@@ -693,6 +698,100 @@ function App() {
     }
   }
 
+  async function checkLocalAgent() {
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8787/health"
+      );
+
+      if (!response.ok) {
+        throw new Error("Local Agent is not running.");
+      }
+
+      return true;
+    } catch {
+      setGitStatus({
+        connected: false,
+        error:
+          "Local Agent is not running. Start it from your project folder."
+      });
+
+      return false;
+    }
+  }
+
+  async function loadGitStatus() {
+    setGitBusy(true);
+    setGitPanelOpen(true);
+
+    try {
+      const connected = await checkLocalAgent();
+
+      if (!connected) return;
+
+      const response = await fetch(
+        "http://127.0.0.1:8787/git/status"
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "Could not read Git status."
+        );
+      }
+
+      setGitStatus({
+        ...data,
+        connected: true
+      });
+    } catch (error) {
+      setGitStatus({
+        connected: false,
+        error:
+          error?.message ||
+          "Could not connect to the Local Agent."
+      });
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function loadGitDiff() {
+    setGitBusy(true);
+
+    try {
+      const connected = await checkLocalAgent();
+
+      if (!connected) return;
+
+      const response = await fetch(
+        "http://127.0.0.1:8787/git/diff"
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "Could not read Git diff."
+        );
+      }
+
+      setGitDiff(data.diff || "");
+      setGitPanelOpen(true);
+    } catch (error) {
+      setGitStatus((current) => ({
+        ...(current || {}),
+        connected: false,
+        error:
+          error?.message ||
+          "Could not load Git diff."
+      }));
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
   function clearProject() {
     setFiles([]);
     setProjectName("");
@@ -705,6 +804,9 @@ function App() {
     setEditApplied(false);
     setShowWorkspaceChanges(false);
     setSelectedWorkspaceChange(null);
+    setGitStatus(null);
+    setGitDiff("");
+    setGitPanelOpen(false);
   }
 
   /*
@@ -1311,6 +1413,111 @@ async function undoAIEdit() {
             ? `↕ Workspace Changes (${workspaceChanges.length})`
             : "↕ Workspace Changes"}
         </button>
+
+        <button
+          className="git-button"
+          type="button"
+          onClick={loadGitStatus}
+          disabled={gitBusy}
+        >
+          {gitBusy
+            ? "⟳ Git..."
+            : "⌘ Git status"}
+        </button>
+
+        {gitPanelOpen && (
+          <div className="git-panel">
+            <div className="git-panel-header">
+              <div>
+                <strong>Local Git</strong>
+                <span>
+                  {gitStatus?.connected
+                    ? "Connected"
+                    : "Not connected"}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                className="git-close-button"
+                onClick={() =>
+                  setGitPanelOpen(false)
+                }
+              >
+                ×
+              </button>
+            </div>
+
+            {gitStatus?.error ? (
+              <div className="git-error">
+                {gitStatus.error}
+              </div>
+            ) : gitStatus?.connected ? (
+              <>
+                <div className="git-repo-info">
+                  <strong>
+                    {gitStatus.branch || "Git repository"}
+                  </strong>
+                  <span>
+                    {gitStatus.clean
+                      ? "Working tree clean"
+                      : `${gitStatus.files?.length || 0} changed file(s)`}
+                  </span>
+                </div>
+
+                <div className="git-actions">
+                  <button
+                    type="button"
+                    onClick={loadGitStatus}
+                    disabled={gitBusy}
+                  >
+                    ↻ Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={loadGitDiff}
+                    disabled={gitBusy}
+                  >
+                    View Git Diff
+                  </button>
+                </div>
+
+                {!gitStatus.clean &&
+                  Array.isArray(gitStatus.files) && (
+                    <div className="git-file-list">
+                      {gitStatus.files.map(
+                        (file, index) => (
+                          <div
+                            className="git-file-row"
+                            key={`${file.path}-${index}`}
+                          >
+                            <span className="git-file-code">
+                              {file.code || "M"}
+                            </span>
+
+                            <span>
+                              {file.path}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                {gitDiff && (
+                  <pre className="git-diff-output">
+                    {gitDiff}
+                  </pre>
+                )}
+              </>
+            ) : (
+              <div className="git-empty">
+                Click Git status to connect to the Local Agent.
+              </div>
+            )}
+          </div>
+        )}
 
         {searchOpen &&
           files.length > 0 && (
