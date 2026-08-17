@@ -514,3 +514,139 @@ textarea::placeholder { color: #6e6e76; }
 .edit-status {
   word-break: break-word;
 }
+
+
+/* ==========================================
+   Workspace Changes / Git-like local diff
+   ========================================== */
+
+.workspace-changes-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #2f2f38;
+  border-radius: 9px;
+  background: #15151a;
+  color: #d9d9df;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.workspace-changes-button:hover:not(:disabled) {
+  background: #1b1b21;
+  border-color: #41414c;
+}
+
+.workspace-changes-button.disabled,
+.workspace-changes-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workspace-changes-panel {
+  margin-top: 10px;
+  border: 1px solid #2b2b33;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0e0e12;
+}
+
+.workspace-changes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #292930;
+}
+
+.workspace-changes-header strong {
+  color: #e8e8ed;
+  font-size: 12px;
+}
+
+.workspace-changes-header span {
+  color: #8f8f9a;
+  font-size: 10px;
+}
+
+.workspace-changes-list {
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.workspace-change-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #1d1d23;
+  background: transparent;
+  color: #cfcfd7;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-change-item:hover {
+  background: #17171c;
+}
+
+.workspace-change-icon {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  background: rgba(255, 190, 80, 0.14);
+  color: #e7b86a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.workspace-change-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+
+.workspace-change-arrow {
+  color: #777782;
+  font-size: 16px;
+}
+
+.workspace-changes-empty {
+  padding: 12px 10px;
+  color: #777782;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.workspace-change-modal {
+  width: min(1100px, 94vw);
+}
+
+.workspace-change-diff {
+  border-top: 1px solid #292930;
+  background: #0b0b0f;
+}
+
+.workspace-change-overlay .diff-columns {
+  max-height: 55vh;
+}
+
+@media (max-width: 800px) {
+  .workspace-change-modal {
+    width: 96vw;
+  }
+
+  .workspace-change-overlay .diff-columns {
+    max-height: 48vh;
+  }
+}
