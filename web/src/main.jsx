@@ -449,8 +449,6 @@ function searchFiles(files, query) {
       });
     }
 
- 
-    
     lines.forEach((line, index) => {
       if (results.length >= 60) return;
 
@@ -467,19 +465,6 @@ function searchFiles(files, query) {
   }
 
   return results;
-}
-
-
-      if (newLine !== undefined) {
-        diff.push({
-          type: "added",
-          newLine
-        });
-      }
-    }
-  }
-
-  return diff;
 }
 
 function App() {
@@ -1593,9 +1578,6 @@ function undoAIEdit() {
         </div>
 
        {editRequest && (
-
-
-{editRequest && (
   <div className="edit-overlay">
 
     <div className="edit-modal">
@@ -1702,10 +1684,8 @@ function undoAIEdit() {
 
   </div>
 )}
-
 </main>
-
-</div>
+    </div>
   );
 }
 
