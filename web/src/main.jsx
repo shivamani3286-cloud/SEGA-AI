@@ -1787,4 +1787,4 @@ function undoAIEdit() {
 
 createRoot(document.getElementById("root")).render(
   <App />
-)
+);
