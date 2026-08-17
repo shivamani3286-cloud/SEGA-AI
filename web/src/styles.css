@@ -503,3 +503,14 @@ textarea::placeholder { color: #6e6e76; }
     max-height: 280px;
   }
 }
+
+
+/* Local file save status */
+.edit-apply-button:disabled,
+.edit-undo-button:disabled {
+  opacity: 0.55;
+}
+
+.edit-status {
+  word-break: break-word;
+}
