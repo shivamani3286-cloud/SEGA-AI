@@ -505,7 +505,25 @@ function App() {
   const [gitBusy, setGitBusy] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
 
+  const [jobPanelOpen, setJobPanelOpen] = useState(false);
+  const [jobQuery, setJobQuery] = useState("fresher DevOps jobs in Hyderabad, India");
+  const [jobBusy, setJobBusy] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [selectedJobs, setSelectedJobs] = useState([]);
+  const [jobStatus, setJobStatus] = useState("");
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeName, setResumeName] = useState("");
+  const [resumeText, setResumeText] = useState("");
+  const [profile, setProfile] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    linkedin: ""
+  });
+
   const folderInput = useRef(null);
+  const resumeInput = useRef(null);
 
   const tree = useMemo(
     () => files.map((f) => f.path).slice(0, 80),
@@ -789,6 +807,236 @@ function App() {
       }));
     } finally {
       setGitBusy(false);
+    }
+  }
+
+  function readResumeFile(file) {
+    if (!file) return;
+
+    setResumeFile(file);
+    setResumeName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      if (file.type.startsWith("text/") || /\.(txt|md|json)$/i.test(file.name)) {
+        setResumeText(result.slice(0, 60000));
+      } else {
+        setResumeText("");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        resolve(null);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const comma = result.indexOf(",");
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error || new Error("Could not read resume."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function searchJobs() {
+    if (!jobQuery.trim()) {
+      setJobStatus("Tell SEGA what kind of jobs you want.");
+      return;
+    }
+
+    if (!resumeFile && !resumeText.trim()) {
+      setJobStatus("Upload your resume first.");
+      return;
+    }
+
+    setJobBusy(true);
+    setJobStatus("SEGA is searching current jobs and matching them to your resume...");
+    setJobs([]);
+    setSelectedJobs([]);
+
+    try {
+      const resumeBase64 = await fileToBase64(resumeFile);
+
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: jobQuery,
+          resumeText,
+          resumeFile: resumeFile
+            ? {
+                name: resumeFile.name,
+                mimeType: resumeFile.type || "application/octet-stream",
+                data: resumeBase64
+              }
+            : null,
+          profile
+        })
+      });
+
+      const raw = await response.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(`Job search returned invalid JSON (HTTP ${response.status}).`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Job search failed.");
+      }
+
+      setJobs(Array.isArray(data.jobs) ? data.jobs : []);
+      setJobStatus(
+        data.jobs?.length
+          ? `Found ${data.jobs.length} suitable jobs. Select the ones you want SEGA to apply to.`
+          : "No suitable jobs were found. Try a broader search."
+      );
+    } catch (error) {
+      console.error("SEGA job search error:", error);
+      setJobStatus(error?.message || "SEGA could not search for jobs.");
+    } finally {
+      setJobBusy(false);
+    }
+  }
+
+  function toggleJob(job) {
+    setSelectedJobs((current) =>
+      current.some((item) => item.url === job.url)
+        ? current.filter((item) => item.url !== job.url)
+        : [...current, job]
+    );
+  }
+
+  async function applySelectedJobs() {
+    if (!selectedJobs.length) {
+      setJobStatus("Select at least one job first.");
+      return;
+    }
+
+    if (!profile.name || !profile.email) {
+      setJobStatus("Enter your name and email before applying.");
+      return;
+    }
+
+    if (!resumeFile) {
+      setJobStatus("Upload the actual resume file before applying.");
+      return;
+    }
+
+    setJobBusy(true);
+    setJobStatus(`Preparing ${selectedJobs.length} application(s)...`);
+
+    try {
+      const connected = await checkLocalAgent();
+      if (!connected) return;
+
+      const resumeBase64 = await fileToBase64(resumeFile);
+      const results = [];
+
+      for (const job of selectedJobs) {
+        setJobStatus(`Applying to ${job.company || "the company"} — ${job.title}...`);
+
+        try {
+          const response = await fetch("http://127.0.0.1:8787/jobs/apply", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              job,
+              profile,
+              resume: {
+                name: resumeFile.name,
+                mimeType: resumeFile.type || "application/octet-stream",
+                data: resumeBase64
+              }
+            })
+          });
+
+          const data = await response.json();
+          results.push({
+            ...job,
+            status: data?.status || (response.ok ? "submitted" : "failed"),
+            message: data?.message || data?.error || "No result returned.",
+            appliedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          results.push({
+            ...job,
+            status: "failed",
+            message: error?.message || "Application failed.",
+            appliedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      setJobs((current) =>
+        current.map((job) => {
+          const result = results.find((item) => item.url === job.url);
+          return result ? { ...job, ...result } : job;
+        })
+      );
+
+      const csv = [
+        [
+          "Date",
+          "Company",
+          "Job Title",
+          "Location",
+          "Match Score",
+          "Job URL",
+          "Status",
+          "Message"
+        ],
+        ...results.map((job) => [
+          job.appliedAt || new Date().toISOString(),
+          job.company || "",
+          job.title || "",
+          job.location || "",
+          job.matchScore ?? "",
+          job.url || "",
+          job.status || "",
+          job.message || ""
+        ])
+      ]
+        .map((row) =>
+          row
+            .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
+            .join(",")
+        )
+        .join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "SEGA_Job_Applications.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+
+      const submitted = results.filter((item) => item.status === "submitted").length;
+      const manual = results.filter((item) => item.status === "manual_required").length;
+      const failed = results.filter((item) => item.status === "failed").length;
+
+      setJobStatus(
+        `Finished: ${submitted} submitted, ${manual} need manual action, ${failed} failed. Application tracker downloaded.`
+      );
+    } catch (error) {
+      console.error("SEGA apply error:", error);
+      setJobStatus(error?.message || "SEGA could not apply to the selected jobs.");
+    } finally {
+      setJobBusy(false);
     }
   }
 
@@ -1415,6 +1663,14 @@ async function undoAIEdit() {
         </button>
 
         <button
+          className="job-agent-button"
+          type="button"
+          onClick={() => setJobPanelOpen(true)}
+        >
+          🤖 Job Agent
+        </button>
+
+        <button
           className="git-button"
           type="button"
           onClick={loadGitStatus}
@@ -1941,6 +2197,153 @@ async function undoAIEdit() {
           </div>
 
         </div>
+
+       {jobPanelOpen && (
+  <div className="job-overlay">
+    <div className="job-modal">
+      <div className="job-header">
+        <div>
+          <strong>SEGA Job Agent</strong>
+          <span>Search, match and apply to selected jobs.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setJobPanelOpen(false)}
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="job-form-grid">
+        <input
+          value={profile.name}
+          onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+          placeholder="Full name"
+        />
+        <input
+          value={profile.email}
+          onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+          placeholder="Email"
+          type="email"
+        />
+        <input
+          value={profile.phone}
+          onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+          placeholder="Phone"
+        />
+        <input
+          value={profile.location}
+          onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+          placeholder="Location"
+        />
+        <input
+          value={profile.linkedin}
+          onChange={(e) => setProfile({ ...profile, linkedin: e.target.value })}
+          placeholder="LinkedIn URL"
+        />
+      </div>
+
+      <div className="job-resume-row">
+        <input
+          ref={resumeInput}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.md,.json"
+          hidden
+          onChange={(e) => readResumeFile(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          className="job-secondary-button"
+          onClick={() => resumeInput.current?.click()}
+        >
+          📄 {resumeName ? "Replace Resume" : "Upload Resume"}
+        </button>
+        <span>{resumeName || "No resume selected"}</span>
+      </div>
+
+      <textarea
+        className="job-query"
+        rows={2}
+        value={jobQuery}
+        onChange={(e) => setJobQuery(e.target.value)}
+        placeholder="Example: fresher DevOps jobs in Hyderabad, remote India"
+      />
+
+      <div className="job-actions">
+        <button
+          type="button"
+          className="job-search-button"
+          onClick={searchJobs}
+          disabled={jobBusy}
+        >
+          {jobBusy ? "Searching..." : "🔎 Find Suitable Jobs"}
+        </button>
+        <button
+          type="button"
+          className="job-apply-button"
+          onClick={applySelectedJobs}
+          disabled={jobBusy || !selectedJobs.length}
+        >
+          {jobBusy ? "Working..." : `🚀 Apply Selected (${selectedJobs.length})`}
+        </button>
+      </div>
+
+      {jobStatus && (
+        <div className="job-status">{jobStatus}</div>
+      )}
+
+      <div className="job-list">
+        {jobs.map((job) => {
+          const selected = selectedJobs.some((item) => item.url === job.url);
+          const status = job.status;
+          return (
+            <div
+              className={`job-card ${selected ? "selected" : ""}`}
+              key={job.url || `${job.company}-${job.title}`}
+            >
+              <label className="job-select-row">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggleJob(job)}
+                  disabled={status === "submitted"}
+                />
+                <div>
+                  <strong>{job.title}</strong>
+                  <span>{job.company} · {job.location}</span>
+                </div>
+                <b>{job.matchScore ?? "—"}%</b>
+              </label>
+
+              <p>{job.reason || "Matched against your resume."}</p>
+
+              <div className="job-meta">
+                <span>{job.experience || "Experience not specified"}</span>
+                <span>{status === "submitted" ? "✓ Applied" : status === "manual_required" ? "⚠ Manual action" : status === "failed" ? "✕ Failed" : "Ready"}</span>
+              </div>
+
+              {job.url && (
+                <a href={job.url} target="_blank" rel="noreferrer">
+                  Open job listing
+                </a>
+              )}
+
+              {job.message && (
+                <div className="job-result-message">{job.message}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="job-disclaimer">
+        SEGA only attempts applications you explicitly select. CAPTCHA, OTP,
+        login challenges and unusual application questions stop the automation
+        and are reported as manual action instead of being bypassed.
+      </div>
+    </div>
+  </div>
+)}
 
        {selectedWorkspaceChange && (
   <div className="edit-overlay workspace-change-overlay">
