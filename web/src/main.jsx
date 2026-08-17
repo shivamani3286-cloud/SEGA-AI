@@ -1758,4 +1758,10 @@ function undoAIEdit() {
   </div>
 )}
 </main>
+    </div>
+  );
+}
 
+createRoot(document.getElementById("root")).render(
+  <App />
+);
