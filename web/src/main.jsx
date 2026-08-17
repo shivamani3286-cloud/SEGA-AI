@@ -1593,6 +1593,9 @@ function undoAIEdit() {
         </div>
 
        {editRequest && (
+
+
+{editRequest && (
   <div className="edit-overlay">
 
     <div className="edit-modal">
@@ -1699,8 +1702,10 @@ function undoAIEdit() {
 
   </div>
 )}
+
 </main>
-    </div>
+
+</div>
   );
 }
 
