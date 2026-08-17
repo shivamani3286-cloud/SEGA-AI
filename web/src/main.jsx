@@ -492,6 +492,7 @@ function App() {
   const [editPrompt, setEditPrompt] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  const [editApplied, setEditApplied] = useState(false);
 
   const folderInput = useRef(null);
 
@@ -682,6 +683,7 @@ function App() {
     setEditRequest(null);
     setEditText("");
     setEditStatus("");
+    setEditApplied(false);
   }
 
   /*
@@ -913,49 +915,175 @@ if (!response.ok) {
   }
 }
 
-function applyAIEdit() {
+async function applyAIEdit() {
   if (!editRequest || !editText.trim()) {
     setEditStatus("No generated edit is available.");
     return;
   }
 
-  const updatedContent = editText;
+  const handle = editRequest.handle;
 
-  setFiles((currentFiles) =>
-    currentFiles.map((file) =>
-      file.path === editRequest.path
-        ? {
-            ...file,
-            content: updatedContent
-          }
-        : file
-    )
-  );
+  if (!handle) {
+    setEditStatus(
+      "This file has no writable handle. Re-open the project with Chrome or Edge using Open project."
+    );
+    return;
+  }
 
-  setEditStatus("✓ Changes applied successfully.");
+  setEditBusy(true);
+  setEditStatus("Saving changes to the local file...");
+
+  try {
+    let permission = "granted";
+
+    if (typeof handle.queryPermission === "function") {
+      permission = await handle.queryPermission({
+        mode: "readwrite"
+      });
+    }
+
+    if (permission !== "granted") {
+      if (typeof handle.requestPermission !== "function") {
+        throw new Error(
+          "Write permission is not available for this file."
+        );
+      }
+
+      permission = await handle.requestPermission({
+        mode: "readwrite"
+      });
+    }
+
+    if (permission !== "granted") {
+      throw new Error(
+        "Write permission was denied. Allow file access and try again."
+      );
+    }
+
+    const writable = await handle.createWritable();
+
+    try {
+      await writable.write(editText);
+    } finally {
+      await writable.close();
+    }
+
+    setFiles((currentFiles) =>
+      currentFiles.map((file) =>
+        file.path === editRequest.path
+          ? {
+              ...file,
+              content: editText,
+              truncated: false
+            }
+          : file
+      )
+    );
+
+    setEditApplied(true);
+    setEditStatus(
+      `✓ Saved changes to ${editRequest.path}`
+    );
+  } catch (error) {
+    console.error("SEGA file save error:", error);
+    setEditStatus(
+      error?.message ||
+      "SEGA could not save the file."
+    );
+  } finally {
+    setEditBusy(false);
+  }
 }
-function undoAIEdit() {
+
+async function undoAIEdit() {
   if (!editRequest) {
     setEditStatus("Nothing to undo.");
     return;
   }
 
   const originalContent = editRequest.original;
+  const handle = editRequest.handle;
+  const wasApplied = editApplied;
 
-  setFiles((currentFiles) =>
-    currentFiles.map((file) =>
-      file.path === editRequest.path
-        ? {
-            ...file,
-            content: originalContent
-          }
-        : file
-    )
+  setEditBusy(true);
+  setEditStatus(
+    wasApplied
+      ? "Restoring the original file..."
+      : "Reverting the browser workspace..."
   );
 
-  setEditText(originalContent);
-  setEditStatus("↶ Changes reverted.");
+  try {
+    if (wasApplied) {
+      if (!handle) {
+        throw new Error(
+          "The writable file handle is no longer available."
+        );
+      }
+
+      let permission = "granted";
+
+      if (typeof handle.queryPermission === "function") {
+        permission = await handle.queryPermission({
+          mode: "readwrite"
+        });
+      }
+
+      if (permission !== "granted") {
+        if (typeof handle.requestPermission !== "function") {
+          throw new Error(
+            "Write permission is not available for this file."
+          );
+        }
+
+        permission = await handle.requestPermission({
+          mode: "readwrite"
+        });
+      }
+
+      if (permission !== "granted") {
+        throw new Error(
+          "Write permission was denied. Allow file access and try again."
+        );
+      }
+
+      const writable = await handle.createWritable();
+
+      try {
+        await writable.write(originalContent);
+      } finally {
+        await writable.close();
+      }
+    }
+
+    setFiles((currentFiles) =>
+      currentFiles.map((file) =>
+        file.path === editRequest.path
+          ? {
+              ...file,
+              content: originalContent
+            }
+          : file
+      )
+    );
+
+    setEditText(originalContent);
+    setEditApplied(false);
+    setEditStatus(
+      wasApplied
+        ? `↶ Restored ${editRequest.path} to the original file.`
+        : "↶ Changes reverted."
+    );
+  } catch (error) {
+    console.error("SEGA undo error:", error);
+    setEditStatus(
+      error?.message ||
+      "SEGA could not restore the file."
+    );
+  } finally {
+    setEditBusy(false);
+  }
 }
+
   function proposeEdit() {
     const path = selectedSearch[0]?.path;
 
@@ -985,6 +1113,7 @@ function undoAIEdit() {
       handle: file.handle
     });
 
+    setEditApplied(false);
     setEditText(file.content);
     setEditPrompt("");
     setEditStatus("");
@@ -992,59 +1121,6 @@ function undoAIEdit() {
     setEditStatus(
       "Review the proposed file before applying it."
     );
-  }
-
-  /*
-   * Actually writes the file.
-   *
-   * NOTHING is written until the user presses
-   * Apply Change.
-   */
-  async function applyEdit() {
-    if (!editRequest) return;
-
-    try {
-      const handle = editRequest.handle;
-
-      if (!handle) {
-        setEditStatus(
-          "No writable file handle available. Re-open the project with Chrome or Edge."
-        );
-        return;
-      }
-
-      const writable =
-        await handle.createWritable();
-
-      await writable.write(editText);
-
-      await writable.close();
-
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.path === editRequest.path
-            ? {
-                ...f,
-                content: editText,
-                truncated: false
-              }
-            : f
-        )
-      );
-
-      const changedPath =
-        editRequest.path;
-
-      setEditRequest(null);
-
-      setEditStatus(
-        `✓ Applied changes to ${changedPath}`
-      );
-    } catch (err) {
-      setEditStatus(
-        `Could not write file: ${err.message}`
-      );
-    }
   }
 
   async function send() {
@@ -1601,6 +1677,7 @@ function undoAIEdit() {
             setEditText("");
             setEditStatus("");
             setShowDiff(false);
+            setEditApplied(false);
           }}
         >
           ×
@@ -1740,7 +1817,11 @@ function undoAIEdit() {
             !editText.trim()
           }
         >
-          ✓ Apply Change
+          {editBusy
+            ? "Saving..."
+            : editApplied
+              ? "✓ Saved"
+              : "✓ Apply Change"}
         </button>
 
         <button
@@ -1752,7 +1833,9 @@ function undoAIEdit() {
             !editText.trim()
           }
         >
-          ↶ Undo
+          {editApplied
+            ? "↶ Restore Original"
+            : "↶ Undo"}
         </button>
 
         <button
@@ -1763,6 +1846,7 @@ function undoAIEdit() {
             setEditText("");
             setEditStatus("");
             setShowDiff(false);
+            setEditApplied(false);
           }}
         >
           Cancel
