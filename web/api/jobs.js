@@ -1,5 +1,6 @@
 function json(res, status, body) {
   res.statusCode = status;
+
   res.setHeader(
     "Content-Type",
     "application/json; charset=utf-8"
@@ -15,12 +16,14 @@ function json(res, status, body) {
   );
 }
 
+
 function cleanText(value) {
   return String(value || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
+
 
 function normalize(value) {
   return String(value || "")
@@ -30,8 +33,236 @@ function normalize(value) {
     .trim();
 }
 
-function getKeywords(query, resumeText) {
-  const source = `${query} ${resumeText}`;
+
+/*
+ * Detect whether the user is asking
+ * specifically for fresher / entry-level jobs.
+ */
+function isFresherSearch(query) {
+  const text = normalize(query);
+
+  return (
+    text.includes("fresher") ||
+    text.includes("freshers") ||
+    text.includes("entry level") ||
+    text.includes("entry-level") ||
+    text.includes("graduate") ||
+    text.includes("new grad") ||
+    text.includes("trainee") ||
+    text.includes("intern") ||
+    text.includes("internship") ||
+    text.includes("0 year") ||
+    text.includes("0-1 year") ||
+    text.includes("0 1 year")
+  );
+}
+
+
+/*
+ * Extract experience requirements.
+ *
+ * Handles:
+ *
+ * 4.00-8.00 Years
+ * 4-8 Years
+ * 4 to 8 Years
+ * 4+ Years
+ * 2 Years
+ * 1.5 years
+ * Minimum 2 years
+ */
+function extractExperienceRange(job) {
+  const text = cleanText(
+    `${job.title || ""} ${
+      job.description || ""
+    }`
+  );
+
+  /*
+   * Example:
+   * Experience: 4.00-8.00 Years
+   */
+  let match = text.match(
+    /(\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)/i
+  );
+
+  if (match) {
+    return {
+      min: parseFloat(match[1]),
+      max: parseFloat(match[2]),
+      text: `${match[1]}-${match[2]} years`
+    };
+  }
+
+
+  /*
+   * Example:
+   * 4+ years
+   */
+  match = text.match(
+    /(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)/i
+  );
+
+  if (match) {
+    const years = parseFloat(match[1]);
+
+    return {
+      min: years,
+      max: years,
+      text: `${match[1]}+ years`
+    };
+  }
+
+
+  /*
+   * Example:
+   * minimum 4 years
+   */
+  match = text.match(
+    /(?:minimum|min\.?|at least)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)/i
+  );
+
+  if (match) {
+    const years = parseFloat(match[1]);
+
+    return {
+      min: years,
+      max: years,
+      text: `${match[1]}+ years`
+    };
+  }
+
+
+  /*
+   * Example:
+   * 2 years of experience
+   */
+  match = text.match(
+    /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:of\s*)?experience/i
+  );
+
+  if (match) {
+    const years = parseFloat(match[1]);
+
+    return {
+      min: years,
+      max: years,
+      text: `${match[1]} years`
+    };
+  }
+
+
+  /*
+   * Explicit fresher / entry-level wording.
+   */
+  if (
+    /fresher|freshers|entry[- ]level|graduate|new grad|trainee|internship|intern/i.test(
+      text
+    )
+  ) {
+    return {
+      min: 0,
+      max: 0,
+      text: "Fresher / Entry Level"
+    };
+  }
+
+
+  return {
+    min: null,
+    max: null,
+    text: "Not specified"
+  };
+}
+
+
+/*
+ * Decide whether a job should be rejected
+ * for a fresher search.
+ */
+function shouldRejectForFresher(
+  job,
+  query
+) {
+  if (!isFresherSearch(query)) {
+    return false;
+  }
+
+  const experience =
+    extractExperienceRange(job);
+
+  /*
+   * If the job explicitly requires
+   * more than 1 year, reject it.
+   */
+  if (
+    experience.max !== null &&
+    experience.max > 1
+  ) {
+    return true;
+  }
+
+
+  /*
+   * If the minimum is more than 1,
+   * definitely reject it.
+   */
+  if (
+    experience.min !== null &&
+    experience.min > 1
+  ) {
+    return true;
+  }
+
+
+  /*
+   * Reject obvious senior roles.
+   */
+  const title =
+    normalize(job.title);
+
+  const seniorTerms = [
+    "senior",
+    "sr.",
+    "sr ",
+    "lead",
+    "principal",
+    "staff",
+    "manager",
+    "architect",
+    "director",
+    "head of",
+    "associate director"
+  ];
+
+  if (
+    seniorTerms.some(
+      (term) =>
+        title.includes(
+          normalize(term)
+        )
+    )
+  ) {
+    return true;
+  }
+
+
+  return false;
+}
+
+
+/*
+ * Extract skills relevant to the
+ * user's resume/query.
+ */
+function getKeywords(
+  query,
+  resumeText
+) {
+  const source =
+    normalize(
+      `${query} ${resumeText}`
+    );
 
   const knownSkills = [
     "aws",
@@ -69,44 +300,47 @@ function getKeywords(query, resumeText) {
     "react"
   ];
 
-  const normalizedSource =
-    normalize(source);
-
   return knownSkills.filter(
     (skill) =>
-      normalizedSource.includes(
+      source.includes(
         normalize(skill)
       )
   );
 }
 
+
+/*
+ * Calculate a simple profile match.
+ */
 function calculateMatch(
   job,
   resumeText,
   query
 ) {
-  const title = normalize(
-    job.title
-  );
+  const title =
+    normalize(job.title);
 
-  const description = normalize(
-    cleanText(job.description)
-  );
+  const description =
+    normalize(
+      cleanText(
+        job.description
+      )
+    );
 
-  const location = normalize(
-    job.location?.display_name
-  );
+  const combined =
+    `${title} ${description}`;
 
-  const combined = `${title} ${description}`;
-
-  const keywords = getKeywords(
-    query,
-    resumeText
-  );
+  const keywords =
+    getKeywords(
+      query,
+      resumeText
+    );
 
   let matched = 0;
 
-  for (const keyword of keywords) {
+  for (
+    const keyword of keywords
+  ) {
     if (
       combined.includes(
         normalize(keyword)
@@ -116,6 +350,7 @@ function calculateMatch(
     }
   }
 
+
   const skillScore =
     keywords.length > 0
       ? Math.round(
@@ -124,6 +359,7 @@ function calculateMatch(
             55
         )
       : 25;
+
 
   let roleScore = 0;
 
@@ -143,7 +379,10 @@ function calculateMatch(
     "linux"
   ];
 
-  for (const role of positiveRoles) {
+
+  for (
+    const role of positiveRoles
+  ) {
     if (
       title.includes(
         normalize(role)
@@ -153,66 +392,67 @@ function calculateMatch(
     }
   }
 
-  roleScore = Math.min(
-    roleScore,
-    25
-  );
+
+  roleScore =
+    Math.min(
+      roleScore,
+      25
+    );
+
 
   let experienceScore = 20;
 
-  const negativeExperience =
-    /(?:3|4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)/i;
-
-  const experienceText =
-    `${job.title || ""} ${
-      job.description || ""
-    }`;
-
-  const experienceMatch =
-    experienceText.match(
-      negativeExperience
+  const experience =
+    extractExperienceRange(
+      job
     );
 
-  if (
-    experienceMatch
-  ) {
-    const years =
-      parseInt(
-        experienceMatch[0],
-        10
-      );
 
-    if (years >= 3) {
-      experienceScore = 0;
-    } else if (years === 2) {
+  /*
+   * Fresher-friendly jobs
+   * get the experience bonus.
+   */
+  if (
+    experience.max !== null
+  ) {
+    if (
+      experience.max <= 1
+    ) {
+      experienceScore = 20;
+    } else if (
+      experience.max <= 2
+    ) {
       experienceScore = 8;
     } else {
-      experienceScore = 15;
+      experienceScore = 0;
     }
   }
 
-  const seniorWords = [
+
+  /*
+   * Senior titles get zero
+   * experience score.
+   */
+  const seniorTerms = [
     "senior",
     "lead",
     "principal",
     "staff",
     "manager",
     "architect",
-    "director",
-    "head of"
+    "director"
   ];
 
-  for (const word of seniorWords) {
-    if (title.includes(word)) {
-      experienceScore = 0;
-      break;
-    }
+
+  if (
+    seniorTerms.some(
+      (term) =>
+        title.includes(term)
+    )
+  ) {
+    experienceScore = 0;
   }
 
-  const remoteBoost =
-    location.includes("remote")
-      ? 3
-      : 0;
 
   const score = Math.max(
     0,
@@ -220,85 +460,19 @@ function calculateMatch(
       100,
       skillScore +
         roleScore +
-        experienceScore +
-        remoteBoost
+        experienceScore
     )
   );
+
 
   return score;
 }
 
-function extractExperience(job) {
-  const text = cleanText(
-    `${job.title || ""} ${
-      job.description || ""
-    }`
-  );
 
-  const patterns = [
-    /(?:minimum|min\.?|at least)\s*(\d+)\s*(?:years?|yrs?)/i,
-
-    /(\d+)\s*(?:-|to)\s*(\d+)\s*(?:years?|yrs?)/i,
-
-    /(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s*)?experience/i
-  ];
-
-  for (
-    const pattern of patterns
-  ) {
-    const match =
-      text.match(pattern);
-
-    if (match) {
-      if (
-        match[2]
-      ) {
-        return `${match[1]}-${match[2]} years`;
-      }
-
-      return `${match[1]}+ years`;
-    }
-  }
-
-  if (
-    /fresher|entry[- ]level|graduate|trainee|internship|intern/i.test(
-      text
-    )
-  ) {
-    return "Fresher / Entry Level";
-  }
-
-  return "Not specified";
-}
-
-function isClearlySenior(job) {
-  const text =
-    normalize(
-      `${job.title || ""} ${
-        job.description || ""
-      }`
-    );
-
-  const seniorTerms = [
-    "senior devops",
-    "lead devops",
-    "principal devops",
-    "senior cloud",
-    "lead cloud",
-    "principal cloud",
-    "devops manager",
-    "engineering manager",
-    "platform architect",
-    "solution architect",
-    "director of"
-  ];
-
-  return seniorTerms.some(
-    (term) =>
-      text.includes(term)
-  );
-}
-
+/*
+ * Create search terms from the
+ * user's request.
+ */
 function makeSearchTerms(
   query
 ) {
@@ -311,6 +485,7 @@ function makeSearchTerms(
     normalized
   );
 
+
   if (
     normalized.includes(
       "devops"
@@ -321,13 +496,14 @@ function makeSearchTerms(
     );
 
     terms.push(
-      "Cloud Engineer"
+      "DevOps Trainee"
     );
 
     terms.push(
-      "DevOps Trainee"
+      "Cloud Engineer"
     );
   }
+
 
   if (
     normalized.includes(
@@ -339,6 +515,7 @@ function makeSearchTerms(
     );
   }
 
+
   if (
     normalized.includes(
       "cloud"
@@ -348,6 +525,7 @@ function makeSearchTerms(
       "Cloud Engineer"
     );
   }
+
 
   if (
     normalized.includes(
@@ -359,13 +537,21 @@ function makeSearchTerms(
     );
   }
 
+
   return [
     ...new Set(
       terms
     )
-  ].slice(0, 4);
+  ].slice(
+    0,
+    4
+  );
 }
 
+
+/*
+ * Search Adzuna.
+ */
 async function searchAdzuna({
   appId,
   appKey,
@@ -376,6 +562,7 @@ async function searchAdzuna({
     new URL(
       "https://api.adzuna.com/v1/api/jobs/in/search/1"
     );
+
 
   url.searchParams.set(
     "app_id",
@@ -397,6 +584,7 @@ async function searchAdzuna({
     what
   );
 
+
   if (where) {
     url.searchParams.set(
       "where",
@@ -404,10 +592,12 @@ async function searchAdzuna({
     );
   }
 
+
   url.searchParams.set(
     "content-type",
     "application/json"
   );
+
 
   const response =
     await fetch(
@@ -420,16 +610,21 @@ async function searchAdzuna({
       }
     );
 
+
   const data =
     await response.json();
 
-  if (!response.ok) {
+
+  if (
+    !response.ok
+  ) {
     throw new Error(
       data?.exception ||
         data?.error ||
         `Adzuna returned HTTP ${response.status}.`
     );
   }
+
 
   return Array.isArray(
     data?.results
@@ -438,6 +633,10 @@ async function searchAdzuna({
     : [];
 }
 
+
+/*
+ * Main Vercel API handler.
+ */
 export default async function handler(
   req,
   res
@@ -455,6 +654,7 @@ export default async function handler(
     );
   }
 
+
   try {
     const body =
       typeof req.body ===
@@ -464,10 +664,12 @@ export default async function handler(
           )
         : req.body || {};
 
+
     const query =
       String(
         body.query || ""
       ).trim();
+
 
     const resumeText =
       String(
@@ -478,8 +680,10 @@ export default async function handler(
         50000
       );
 
+
     const profile =
       body.profile || {};
+
 
     if (!query) {
       return json(
@@ -492,11 +696,14 @@ export default async function handler(
       );
     }
 
+
     const appId =
       process.env.ADZUNA_APP_ID;
 
+
     const appKey =
       process.env.ADZUNA_APP_KEY;
+
 
     if (
       !appId ||
@@ -512,10 +719,12 @@ export default async function handler(
       );
     }
 
+
     const searchTerms =
       makeSearchTerms(
         query
       );
+
 
     const location =
       String(
@@ -523,7 +732,9 @@ export default async function handler(
           ""
       ).trim();
 
+
     let allJobs = [];
+
 
     for (
       const searchTerm of searchTerms
@@ -539,6 +750,7 @@ export default async function handler(
             }
           );
 
+
         allJobs.push(
           ...results
         );
@@ -550,12 +762,13 @@ export default async function handler(
       }
     }
 
-    /*
-     * Remove duplicate listings.
-     */
 
+    /*
+     * Remove duplicates.
+     */
     const uniqueJobs =
       new Map();
+
 
     for (
       const job of allJobs
@@ -567,6 +780,7 @@ export default async function handler(
             `${job.company?.display_name}-${job.title}`
         );
 
+
       if (
         !uniqueJobs.has(key)
       ) {
@@ -577,26 +791,27 @@ export default async function handler(
       }
     }
 
-    /*
-     * Filter obvious senior jobs.
-     */
 
+    /*
+     * Filter jobs BEFORE scoring.
+     *
+     * This is the important fix.
+     */
     const filtered =
       Array.from(
         uniqueJobs.values()
       ).filter(
         (job) =>
-          !isClearlySenior(
-            job
+          !shouldRejectForFresher(
+            job,
+            query
           )
       );
 
-    /*
-     * Convert API results into
-     * the exact shape your current
-     * SEGA Job Agent expects.
-     */
 
+    /*
+     * Convert into SEGA job cards.
+     */
     const jobs =
       filtered
         .map(
@@ -606,6 +821,7 @@ export default async function handler(
                 job.title
               );
 
+
             const company =
               cleanText(
                 job.company
@@ -613,10 +829,12 @@ export default async function handler(
                   "Unknown company"
               );
 
+
             const description =
               cleanText(
                 job.description
               );
+
 
             const locationName =
               cleanText(
@@ -626,11 +844,19 @@ export default async function handler(
                   "Not specified"
               );
 
+
             const applicationUrl =
               String(
                 job.redirect_url ||
                   ""
               );
+
+
+            const experience =
+              extractExperienceRange(
+                job
+              );
+
 
             const matchScore =
               calculateMatch(
@@ -639,11 +865,13 @@ export default async function handler(
                 query
               );
 
+
             const skills =
               getKeywords(
                 query,
                 `${resumeText} ${description} ${title}`
               );
+
 
             return {
               company,
@@ -654,9 +882,7 @@ export default async function handler(
                 locationName,
 
               experience:
-                extractExperience(
-                  job
-                ),
+                experience.text,
 
               url:
                 applicationUrl,
@@ -704,6 +930,7 @@ export default async function handler(
           12
         );
 
+
     return json(
       res,
       200,
@@ -716,6 +943,7 @@ export default async function handler(
       "SEGA jobs API error:",
       error
     );
+
 
     return json(
       res,
