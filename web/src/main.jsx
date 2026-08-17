@@ -1622,6 +1622,102 @@ function undoAIEdit() {
         spellCheck={false}
       />
 
+      {showDiff && (
+        <div className="diff-viewer">
+          <div className="diff-viewer-header">
+            <div>
+              <strong>Changes</strong>
+              <span>Original vs proposed</span>
+            </div>
+            <span className="diff-file-name">
+              {editRequest.path}
+            </span>
+          </div>
+
+          <div className="diff-summary">
+            {(() => {
+              const diff = createDiff(
+                editRequest.original,
+                editText
+              );
+              const added = diff.filter(
+                (item) => item.type === "added"
+              ).length;
+              const removed = diff.filter(
+                (item) => item.type === "removed"
+              ).length;
+
+              return (
+                <>
+                  <span className="diff-added-count">
+                    +{added} added
+                  </span>
+                  <span className="diff-removed-count">
+                    −{removed} removed
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="diff-columns">
+            <div className="diff-column">
+              <div className="diff-column-title original">
+                <span>Original</span>
+              </div>
+
+              <div className="diff-code">
+                {createDiff(
+                  editRequest.original,
+                  editText
+                ).map((item, index) => (
+                  <div
+                    key={`old-${index}`}
+                    className={`diff-line diff-line-${item.type}`}
+                  >
+                    <span className="diff-prefix">
+                      {item.type === "removed" ? "−" : " "}
+                    </span>
+                    <code>
+                      {item.type === "added"
+                        ? ""
+                        : item.text}
+                    </code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="diff-column">
+              <div className="diff-column-title proposed">
+                <span>Proposed</span>
+              </div>
+
+              <div className="diff-code">
+                {createDiff(
+                  editRequest.original,
+                  editText
+                ).map((item, index) => (
+                  <div
+                    key={`new-${index}`}
+                    className={`diff-line diff-line-${item.type}`}
+                  >
+                    <span className="diff-prefix">
+                      {item.type === "added" ? "+" : " "}
+                    </span>
+                    <code>
+                      {item.type === "removed"
+                        ? ""
+                        : item.text}
+                    </code>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="edit-actions">
 
         <button
@@ -1691,4 +1787,4 @@ function undoAIEdit() {
 
 createRoot(document.getElementById("root")).render(
   <App />
-);
+)
